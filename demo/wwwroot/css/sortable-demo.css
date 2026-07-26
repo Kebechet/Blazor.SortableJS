@@ -1,0 +1,32 @@
+/* Styling for the story canvases only - not shipped with the package. */
+
+.demo-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-width: 320px;
+}
+
+.demo-item {
+    background: #fff;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: system-ui, sans-serif;
+    cursor: grab;
+}
+
+.demo-item:active {
+    cursor: grabbing;
+}
+
+.demo-ghost {
+    opacity: .4;
+}
+
+.demo-chosen {
+    border-color: #0969da;
+}
