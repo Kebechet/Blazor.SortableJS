@@ -5,10 +5,13 @@
 [![NuGet Downloads](https://img.shields.io/nuget/dt/Kebechet.Blazor.SortableJS)](https://www.nuget.org/packages/Kebechet.Blazor.SortableJS/)
 [![Build](https://github.com/Kebechet/Blazor.SortableJS/actions/workflows/build.yml/badge.svg)](https://github.com/Kebechet/Blazor.SortableJS/actions/workflows/build.yml)
 [![codecov](https://codecov.io/gh/Kebechet/Blazor.SortableJS/graph/badge.svg)](https://codecov.io/gh/Kebechet/Blazor.SortableJS)
+[![Storybook](https://img.shields.io/badge/storybook-live%20demo-ff4785)](https://kebechet.github.io/Blazor.SortableJS/)
 ![Last updated](https://img.shields.io/github/last-commit/Kebechet/Blazor.SortableJS/main?label=last%20updated)
 [![Twitter](https://img.shields.io/twitter/url/https/twitter.com/samuel_sidor.svg?style=social&label=Follow%20samuel_sidor)](https://x.com/samuel_sidor)
 
 A typed Blazor wrapper for [SortableJS 1.15.7](https://github.com/SortableJS/Sortable). The pinned bundle is a static web asset and is registered automatically: no npm install, CDN, or script tag is required.
+
+**[Live storybook](https://kebechet.github.io/Blazor.SortableJS/)** - interactive stories for every feature.
 
 ## Installation
 
