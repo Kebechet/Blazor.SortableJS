@@ -1,0 +1,10 @@
+<section class="demo-model" aria-label="Live C# model state">
+    <h3>Live C# model</h3>
+    <p>Each item shows its current CLR identity and the identity captured when the instance was created.</p>
+    <pre data-testid="model-state">@Json</pre>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Json { get; set; } = string.Empty;
+}

@@ -1,16 +1,37 @@
 @attribute [Stories("SortableJS/Basic")]
 
-<Stories TComponent="Sortable<string>">
+<Stories TComponent="SortableStoryArgs">
     <Story Name="Reorder in place">
-        <Template>
-            <Sortable TItem="string" Items="_items" Options="_options" RootClass="demo-list" ItemClass="demo-item">
-                <ItemTemplate Context="item">@item</ItemTemplate>
+        <Template Context="context">
+            <Sortable TItem="DemoItem"
+                      Items="_items"
+                      Options="@StorySupport.WithFallback(_options, context.Args)"
+                      ItemKeySelector="@(item => item.Key)"
+                      OnEnd="ModelChanged"
+                      RootClass="demo-list"
+                      ItemClass="demo-item"
+                      data-testid="basic-list"
+                      data-fallback-forced="@StorySupport.FallbackAttributeValue(context.Args)">
+                <ItemTemplate Context="item">
+                    <span class="demo-item-content" data-item-key="@item.Key" data-testid="item-@item.Key">@item.Label</span>
+                </ItemTemplate>
             </Sortable>
+            <ModelState Json="@ModelJson" />
         </Template>
     </Story>
 </Stories>
 
 @code {
-    private readonly List<string> _items = new() { "Read brief", "Build API", "Verify package" };
+    private readonly List<DemoItem> _items =
+    [
+        new("read-brief", "Read brief"),
+        new("build-api", "Build API"),
+        new("verify-package", "Verify package")
+    ];
+
     private readonly SortableOptions _options = new() { AnimationDuration = 150, GhostClass = "demo-ghost", ChosenClass = "demo-chosen" };
+
+    private string ModelJson => StorySupport.SerializeState(new DemoCollection("items", _items));
+
+    private void ModelChanged() => StateHasChanged();
 }

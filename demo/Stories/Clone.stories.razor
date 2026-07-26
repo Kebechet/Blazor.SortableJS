@@ -1,23 +1,58 @@
 @attribute [Stories("SortableJS/Features")]
 
-<Stories TComponent="Sortable<string>">
+<Stories TComponent="SortableStoryArgs">
     <Story Name="Clone mode">
-        <Template>
+        <Template Context="context">
             <div class="demo-board">
-                <Sortable TItem="string" Items="_palette" Options="_paletteOptions" RootClass="demo-list" ItemClass="demo-item">
-                    <ItemTemplate Context="item">@item</ItemTemplate>
-                </Sortable>
-                <Sortable TItem="string" Items="_canvas" Options="_canvasOptions" RootClass="demo-list demo-drop-zone" ItemClass="demo-item">
-                    <ItemTemplate Context="item">@item</ItemTemplate>
-                </Sortable>
+                <div>
+                    <h3>Palette</h3>
+                    <Sortable TItem="DemoItem"
+                              Items="_palette"
+                              Options="@StorySupport.WithFallback(_paletteOptions, context.Args)"
+                              ItemKeySelector="@(item => item.Key)"
+                              OnEnd="ModelChanged"
+                              RootClass="demo-list"
+                              ItemClass="demo-item"
+                              data-testid="palette-list"
+                              data-fallback-forced="@StorySupport.FallbackAttributeValue(context.Args)">
+                        <ItemTemplate Context="item">
+                            <span class="demo-item-content" data-item-key="@item.Key" data-testid="item-@item.Key">@item.Label</span>
+                        </ItemTemplate>
+                    </Sortable>
+                </div>
+                <div>
+                    <h3>Canvas</h3>
+                    <Sortable TItem="DemoItem"
+                              Items="_canvas"
+                              CloneFunction="CloneItem"
+                              Options="@StorySupport.WithFallback(_canvasOptions, context.Args)"
+                              ItemKeySelector="@(item => item.Key)"
+                              OnEnd="ModelChanged"
+                              RootClass="demo-list demo-drop-zone"
+                              ItemClass="demo-item"
+                              data-testid="canvas-list"
+                              data-fallback-forced="@StorySupport.FallbackAttributeValue(context.Args)">
+                        <ItemTemplate Context="item">
+                            <span class="demo-item-content" data-item-key="@item.Key" data-testid="item-@item.Key">@item.Label</span>
+                        </ItemTemplate>
+                    </Sortable>
+                </div>
             </div>
+            <ModelState Json="@ModelJson" />
         </Template>
     </Story>
 </Stories>
 
 @code {
-    private readonly List<string> _palette = new() { "Heading", "Paragraph", "Button" };
-    private readonly List<string> _canvas = new();
+    private readonly List<DemoItem> _palette =
+    [
+        new("heading", "Heading"),
+        new("paragraph", "Paragraph"),
+        new("button", "Button")
+    ];
+
+    private readonly List<DemoItem> _canvas = [];
+    private int _nextCloneId;
     private readonly SortableOptions _paletteOptions = new()
     {
         Group = new SortableGroupOptions { Name = "designer", PullMode = PullMode.Clone, PutMode = PutMode.Disabled }
@@ -26,4 +61,10 @@
     {
         Group = new SortableGroupOptions { Name = "designer", PullMode = PullMode.Enabled, PutMode = PutMode.Enabled }
     };
+
+    private string ModelJson => StorySupport.SerializeState(new DemoCollection("palette", _palette), new DemoCollection("canvas", _canvas));
+
+    private DemoItem CloneItem(DemoItem item) => new($"{item.Key}-clone-{++_nextCloneId}", item.Label);
+
+    private void ModelChanged() => StateHasChanged();
 }

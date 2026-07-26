@@ -15,8 +15,14 @@
     border: 1px solid #d0d7de;
     border-radius: 6px;
     padding: 10px 12px;
+    min-height: 24px;
     font-family: system-ui, sans-serif;
     cursor: grab;
+}
+
+.demo-item-content {
+    display: block;
+    min-height: 24px;
 }
 
 .demo-item:active {
@@ -38,6 +44,7 @@
 }
 
 .demo-board > .demo-list,
+.demo-board > div > .demo-list,
 .demo-drop-zone {
     min-height: 80px;
     min-width: 220px;
@@ -68,4 +75,24 @@
 .demo-tree {
     margin-top: 8px;
     margin-left: 18px;
+}
+
+.demo-model {
+    margin-top: 24px;
+    max-width: 900px;
+    font-family: system-ui, sans-serif;
+}
+
+.demo-model h3,
+.demo-model p {
+    margin: 0 0 8px;
+}
+
+.demo-model pre {
+    overflow-x: auto;
+    padding: 12px;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    background: #f6f8fa;
+    white-space: pre-wrap;
 }

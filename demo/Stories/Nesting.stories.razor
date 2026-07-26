@@ -1,17 +1,39 @@
 @attribute [Stories("SortableJS/Features")]
 
-<Stories TComponent="Sortable<TreeNode>">
+<Stories TComponent="SortableStoryArgs">
     <Story Name="Arbitrarily nested lists">
-        <Template>
-            <RecursiveTree Items="_tree" />
+        <Template Context="context">
+            <RecursiveTree Items="_tree"
+                           ListTestId="tree-root"
+                           ForceFallback="@StorySupport.IsFallbackForced(context.Args)"
+                           ModelChanged="ModelChanged" />
+            <ModelState Json="@ModelJson" />
         </Template>
     </Story>
 </Stories>
 
 @code {
-    private readonly List<TreeNode> _tree = new()
+    private readonly TreeNode _components = new("Components");
+    private TreeNode _web = null!;
+    private TreeNode _applications = null!;
+    private readonly TreeNode _mobile = new("Mobile");
+    private readonly TreeNode _sortableJs = new("SortableJS");
+    private TreeNode _libraries = null!;
+    private List<TreeNode> _tree = null!;
+
+    protected override void OnInitialized()
     {
-        new("Applications", new TreeNode("Web", new TreeNode("Components")), new TreeNode("Mobile")),
-        new("Libraries", new TreeNode("SortableJS"))
-    };
+        _web = new("Web", _components);
+        _applications = new("Applications", _web, _mobile);
+        _libraries = new("Libraries", _sortableJs);
+        _tree = [_applications, _libraries];
+    }
+
+    private string ModelJson => StorySupport.SerializeState(
+        new DemoCollection("root", _tree),
+        new DemoCollection("applications-children", _applications.Children),
+        new DemoCollection("web-children", _web.Children),
+        new DemoCollection("libraries-children", _libraries.Children));
+
+    private void ModelChanged() => StateHasChanged();
 }

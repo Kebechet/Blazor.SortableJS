@@ -1,0 +1,35 @@
+name: Real browser drags
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  BUILD_CONFIGURATION: Release
+  E2E_PROJECT: tests/Blazor.SortableJS.E2E/Blazor.SortableJS.E2E.csproj
+
+jobs:
+  drag-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore e2e suite and demo
+      run: |
+        dotnet restore ${{ env.E2E_PROJECT }}
+        dotnet restore demo/Blazor.SortableJS.Demo.csproj
+
+    - name: Run real Chrome drag tests
+      run: dotnet test ${{ env.E2E_PROJECT }} --no-restore --configuration ${{ env.BUILD_CONFIGURATION }}
