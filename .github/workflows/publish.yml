@@ -37,9 +37,10 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore ${{ env.SOLUTION_PATH }}
 
-      # Never `dotnet pack`: for a multi-target RCL it silently drops the wwwroot static web
-      # assets, producing a package with no JS and no build/*.props. The static-web-assets pack
-      # pipeline only runs for the build-time pack triggered by GeneratePackageOnBuild.
+      # GeneratePackageOnBuild means the build itself emits the .nupkg (and .snupkg) under
+      # src/<Project>/bin/<Config>/, so a separate `dotnet pack` step is redundant - and a
+      # standalone `dotnet pack` fails outright with NU5026. The artifact is verified below
+      # rather than trusted, because a package can lose its static web assets and still publish.
       - name: Build (produces the .nupkg via GeneratePackageOnBuild)
         run: dotnet build ${{ env.SOLUTION_PATH }} --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
