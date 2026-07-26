@@ -8,7 +8,7 @@
 ![Last updated](https://img.shields.io/github/last-commit/Kebechet/Blazor.SortableJS/main?label=last%20updated)
 [![Twitter](https://img.shields.io/twitter/url/https/twitter.com/samuel_sidor.svg?style=social&label=Follow%20samuel_sidor)](https://x.com/samuel_sidor)
 
-Blazor wrapper for the [SortableJS](https://github.com/SortableJS/Sortable) drag-and-drop reordering library. Ships the SortableJS bundle and registers it automatically - no npm, no CDN, no manual script tags.
+A typed Blazor wrapper for [SortableJS 1.15.7](https://github.com/SortableJS/Sortable). The pinned bundle is a static web asset and is registered automatically: no npm install, CDN, or script tag is required.
 
 ## Installation
 
@@ -18,19 +18,82 @@ dotnet add package Kebechet.Blazor.SortableJS
 
 ## Usage
 
-```csharp
-// TODO: Add usage examples
+The bound `IList<T>` is reordered in place. Item objects are never serialized through JavaScript, so their reference identity is preserved.
+
+```razor
+@using Kebechet.Blazor.SortableJS
+
+<Sortable Items="_exercises" Context="exercise"
+          Options="_options"
+          ItemClass="exercise-card">
+    <ItemTemplate>@exercise.Name</ItemTemplate>
+</Sortable>
+
+@code {
+    private readonly List<Exercise> _exercises = new()
+    {
+        new("Squat"),
+        new("Bench press"),
+        new("Deadlift")
+    };
+
+    private readonly SortableOptions _options = new()
+    {
+        AnimationDuration = 150,
+        GhostClass = "drag-ghost"
+    };
+
+    private sealed record Exercise(string Name);
+}
 ```
+
+Connected and nested lists only need the same group name. Each component registers itself automatically, regardless of nesting depth.
+
+```razor
+<Sortable Items="_backlog" Options="_connected" Context="item">
+    <ItemTemplate>@item</ItemTemplate>
+</Sortable>
+<Sortable Items="_done" Options="_connected" Context="item">
+    <ItemTemplate>@item</ItemTemplate>
+</Sortable>
+
+@code {
+    private readonly List<string> _backlog = new() { "Design", "Implement" };
+    private readonly List<string> _done = new() { "Verify" };
+    private readonly SortableOptions _connected = new()
+    {
+        Group = new SortableGroupOptions
+        {
+            Name = "work",
+            PullMode = PullMode.Enabled,
+            PutMode = PutMode.Enabled
+        }
+    };
+}
+```
+
+Use `CloneFunction` to create a distinct object for clone mode, or `ConvertFunction` on a destination whose item type differs from the source. `ShouldUseItemKeys` is enabled by default; set `ItemKeySelector` when the item itself is not the desired stable key. `SortableDefaults.Options` supplies app-wide defaults.
+
+All fifteen callbacks use `SortableEventArgs<TItem>`. `OnAdd` runs before collection mutation, while the moved reference is still in the source; `OnRemove` follows. `OldIndexes` and `NewIndexes` contain every affected index for MultiDrag, not only the primary item.
 
 ## Coverage vs. SortableJS 1.15.7
 
-TODO: fill in once the typed surface is implemented. Counts are derived from SortableJS's
-own option and event lists, excluding internals.
-
-| Axis | SortableJS | This package |
+| Axis | SortableJS 1.15.7 | This package |
 |---|---:|---:|
-| Options | 30 | - |
-| Events | 15 | - |
+| Options | 47 | 47 |
+| Events | 15 | 15 |
+
+The counts come from the actual vendored 1.15.7 source: 33 core options, 6 AutoScroll options, 2 OnSpill options, 2 Swap options, and 4 MultiDrag options. The event count is the 12 core callbacks plus MultiDrag `select`/`deselect` and OnSpill `spill`. Internal plugin hooks are excluded. Function-valued JavaScript options are represented by typed Blazor-friendly forms: local-storage `SortableStoreOptions`, `SetDataText`/`SetDataTextSelector`, `SortableDirection`, CSS filter and scroll-container selectors, and `ShouldContinueNativeScrolling`.
+
+## Features
+
+- In-place same-list, cross-list, and multi-item moves with reference identity preserved
+- Automatic depth-independent registration for recursive lists
+- Pull/put group policies, clone mode, and cross-type conversion
+- MultiDrag, Swap, AutoScroll, RevertOnSpill, and RemoveOnSpill
+- Stable keyed rendering and app-wide defaults
+- DOM rollback before Blazor mutation, full event coverage, and deterministic disposal
+- `net6.0` through `net10.0`
 
 ## License
 

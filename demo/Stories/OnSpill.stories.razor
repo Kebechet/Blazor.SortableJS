@@ -1,0 +1,29 @@
+@attribute [Stories("SortableJS/Features")]
+
+<Stories TComponent="Sortable<string>">
+    <Story Name="OnSpill policies">
+        <Template>
+            <div class="demo-board">
+                <div>
+                    <p>Drop outside: revert</p>
+                    <Sortable TItem="string" Items="_reverting" Options="_revertOptions" RootClass="demo-list" ItemClass="demo-item">
+                        <ItemTemplate Context="item">@item</ItemTemplate>
+                    </Sortable>
+                </div>
+                <div>
+                    <p>Drop outside: remove</p>
+                    <Sortable TItem="string" Items="_removing" Options="_removeOptions" RootClass="demo-list" ItemClass="demo-item">
+                        <ItemTemplate Context="item">@item</ItemTemplate>
+                    </Sortable>
+                </div>
+            </div>
+        </Template>
+    </Story>
+</Stories>
+
+@code {
+    private readonly List<string> _reverting = new() { "I come back" };
+    private readonly List<string> _removing = new() { "I am removed" };
+    private readonly SortableOptions _revertOptions = new() { ShouldRevertOnSpill = true };
+    private readonly SortableOptions _removeOptions = new() { ShouldRemoveOnSpill = true };
+}

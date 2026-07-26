@@ -1,0 +1,20 @@
+@if (Items.Count > 0)
+{
+    <Sortable TItem="TreeNode" Items="Items" Options="TreeOptions" RootClass="demo-list demo-tree" ItemClass="demo-item">
+        <ItemTemplate Context="node">
+            <span>@node.Label</span>
+            <RecursiveTree Items="node.Children" />
+        </ItemTemplate>
+    </Sortable>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public IList<TreeNode> Items { get; set; } = new List<TreeNode>();
+
+    private static SortableOptions TreeOptions { get; } = new()
+    {
+        AnimationDuration = 150,
+        Group = new SortableGroupOptions { Name = "tree" }
+    };
+}

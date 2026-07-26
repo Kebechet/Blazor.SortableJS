@@ -30,3 +30,42 @@
 .demo-chosen {
     border-color: #0969da;
 }
+
+.demo-board {
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+}
+
+.demo-board > .demo-list,
+.demo-drop-zone {
+    min-height: 80px;
+    min-width: 220px;
+}
+
+.demo-horizontal {
+    flex-direction: row;
+    max-width: none;
+}
+
+.demo-selected {
+    background: #ddf4ff;
+    border-color: #0969da;
+}
+
+.demo-swap {
+    background: #fff8c5;
+    border-color: #9a6700;
+}
+
+.demo-scroll-container {
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid #d0d7de;
+    padding: 12px;
+}
+
+.demo-tree {
+    margin-top: 8px;
+    margin-left: 18px;
+}

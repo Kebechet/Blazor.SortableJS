@@ -1,0 +1,17 @@
+@attribute [Stories("SortableJS/Features")]
+
+<Stories TComponent="Sortable<TreeNode>">
+    <Story Name="Arbitrarily nested lists">
+        <Template>
+            <RecursiveTree Items="_tree" />
+        </Template>
+    </Story>
+</Stories>
+
+@code {
+    private readonly List<TreeNode> _tree = new()
+    {
+        new("Applications", new TreeNode("Web", new TreeNode("Components")), new TreeNode("Mobile")),
+        new("Libraries", new TreeNode("SortableJS"))
+    };
+}

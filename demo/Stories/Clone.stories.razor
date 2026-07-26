@@ -1,0 +1,29 @@
+@attribute [Stories("SortableJS/Features")]
+
+<Stories TComponent="Sortable<string>">
+    <Story Name="Clone mode">
+        <Template>
+            <div class="demo-board">
+                <Sortable TItem="string" Items="_palette" Options="_paletteOptions" RootClass="demo-list" ItemClass="demo-item">
+                    <ItemTemplate Context="item">@item</ItemTemplate>
+                </Sortable>
+                <Sortable TItem="string" Items="_canvas" Options="_canvasOptions" RootClass="demo-list demo-drop-zone" ItemClass="demo-item">
+                    <ItemTemplate Context="item">@item</ItemTemplate>
+                </Sortable>
+            </div>
+        </Template>
+    </Story>
+</Stories>
+
+@code {
+    private readonly List<string> _palette = new() { "Heading", "Paragraph", "Button" };
+    private readonly List<string> _canvas = new();
+    private readonly SortableOptions _paletteOptions = new()
+    {
+        Group = new SortableGroupOptions { Name = "designer", PullMode = PullMode.Clone, PutMode = PutMode.Disabled }
+    };
+    private readonly SortableOptions _canvasOptions = new()
+    {
+        Group = new SortableGroupOptions { Name = "designer", PullMode = PullMode.Enabled, PutMode = PutMode.Enabled }
+    };
+}

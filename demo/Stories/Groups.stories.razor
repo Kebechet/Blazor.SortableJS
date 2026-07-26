@@ -1,0 +1,43 @@
+@attribute [Stories("SortableJS/Features")]
+
+<Stories TComponent="Sortable<string>">
+    <Story Name="Connected groups with pull and put policies">
+        <Template>
+            <div class="demo-board">
+                <Sortable TItem="string" Items="_backlog" Options="_sourceOptions" RootClass="demo-list" ItemClass="demo-item">
+                    <ItemTemplate Context="item">@item</ItemTemplate>
+                </Sortable>
+                <Sortable TItem="string" Items="_done" Options="_destinationOptions" RootClass="demo-list" ItemClass="demo-item">
+                    <ItemTemplate Context="item">@item</ItemTemplate>
+                </Sortable>
+            </div>
+        </Template>
+    </Story>
+</Stories>
+
+@code {
+    private readonly List<string> _backlog = new() { "Design", "Implement" };
+    private readonly List<string> _done = new() { "Scaffold" };
+    private readonly SortableOptions _sourceOptions = new()
+    {
+        AnimationDuration = 150,
+        Group = new SortableGroupOptions
+        {
+            Name = "backlog",
+            PullMode = PullMode.ListedGroups,
+            PullGroups = new[] { "done" },
+            PutMode = PutMode.Disabled
+        }
+    };
+    private readonly SortableOptions _destinationOptions = new()
+    {
+        AnimationDuration = 150,
+        Group = new SortableGroupOptions
+        {
+            Name = "done",
+            PullMode = PullMode.Disabled,
+            PutMode = PutMode.ListedGroups,
+            PutGroups = new[] { "backlog" }
+        }
+    };
+}

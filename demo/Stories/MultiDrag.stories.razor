@@ -1,0 +1,23 @@
+@attribute [Stories("SortableJS/Features")]
+
+<Stories TComponent="Sortable<string>">
+    <Story Name="MultiDrag">
+        <Template>
+            <p>Hold Control (Command on macOS when configured with Meta) to select several items, then drag the selection.</p>
+            <Sortable TItem="string" Items="_items" Options="_options" RootClass="demo-list" ItemClass="demo-item">
+                <ItemTemplate Context="item">@item</ItemTemplate>
+            </Sortable>
+        </Template>
+    </Story>
+</Stories>
+
+@code {
+    private readonly List<string> _items = new() { "Alpha", "Bravo", "Charlie", "Delta", "Echo" };
+    private readonly SortableOptions _options = new()
+    {
+        AnimationDuration = 150,
+        IsMultiDragEnabled = true,
+        MultiDragKey = SortableMultiDragKey.Control,
+        SelectedClass = "demo-selected"
+    };
+}
