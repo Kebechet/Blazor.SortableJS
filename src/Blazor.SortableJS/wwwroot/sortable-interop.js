@@ -102,7 +102,10 @@ function buildOptions(state, defaultOptions, componentOptions) {
 
     for (const eventName of eventNames) {
         options[`on${capitalize(eventName)}`] = event => {
-            if (eventName === "start") {
+            // SortableJS appends its fallback ghost (and may insert plugin clones) before
+            // dispatching "start". "choose" runs before those child-list mutations, so this
+            // snapshot contains only the DOM that Blazor last rendered.
+            if (eventName === "choose") {
                 captureSnapshots();
             }
 
