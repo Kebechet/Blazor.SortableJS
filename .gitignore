@@ -483,3 +483,7 @@ $RECYCLE.BIN/
 
 # Claude Code
 .claude/settings.local.json
+
+# The stock VS template ignores *.e2e, and git matches ignore patterns case-insensitively on
+# Windows - which silently swallows the whole tests/Blazor.SortableJS.E2E/ directory.
+!/tests/Blazor.SortableJS.E2E/
