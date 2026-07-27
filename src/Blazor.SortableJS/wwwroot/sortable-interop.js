@@ -1,9 +1,12 @@
+import {
+    itemMarkerAttribute,
+    setDataTextAttribute,
+    undraggableClass,
+    indexOfChild,
+    resolveQueueOwner
+} from "./sortable-policy.js";
+
 const sortableScriptMarker = "data-kebechet-sortablejs";
-// Mirrors SortableInteropNames on the .NET side. These are a format contract between the component,
-// which writes them into the DOM, and the selectors below, which read them back out.
-const itemMarkerAttribute = "data-sortable-item";
-const setDataTextAttribute = "data-sortable-text";
-const undraggableClass = "kebechet-sortable-undraggable";
 const sortableReadyTimeoutMilliseconds = 15000;
 const sortablePollIntervalMilliseconds = 16;
 const eventNames = [
@@ -15,6 +18,7 @@ const dragSnapshots = new Map();
 let activeDragQueue = null;
 let dragToken = 0;
 let hasDeferredSpill = false;
+let hasDragStarted = false;
 
 // SortableJS reads the return value of onMove, group.pull and group.put on the spot, so these
 // cannot go through the asynchronous event queue like every other callback. `invokeMethod` is
@@ -28,10 +32,6 @@ function decideSynchronously(state, methodName, request, fallback) {
         console.error(`Kebechet.Blazor.SortableJS ${methodName} failed.`, error);
         return fallback;
     }
-}
-
-function indexOfChild(container, child) {
-    return container && child ? Array.prototype.indexOf.call(container.children, child) : -1;
 }
 
 function decisionRequest(event) {
@@ -51,6 +51,8 @@ export async function create(id, dotNetReference, defaultOptions, componentOptio
         throw new Error(`Cannot initialize SortableJS because element '${id}' was not found.`);
     }
 
+    capturePristineDefaults(Sortable);
+
     const state = { id, element, dotNetReference, sortable: null, appliedKeys: new Set(), isDestroyed: false, decisions: decisions ?? {} };
     const options = buildOptions(state, defaultOptions, componentOptions);
     state.sortable = new Sortable(element, options);
@@ -68,9 +70,22 @@ export async function create(id, dotNetReference, defaultOptions, componentOptio
             // IsDisabled and then clear it and the list stays disabled. Restore whatever SortableJS
             // itself would have used for keys that have gone away.
             for (const key of state.appliedKeys) {
-                if (!nextKeys.has(key)) {
-                    state.sortable.option(key, pristineDefaults(Sortable)[key]);
+                if (nextKeys.has(key)) {
+                    continue;
                 }
+
+                // `option(key, undefined)` is a *getter* in SortableJS, so handing it a pristine
+                // value that happens to be undefined - every plugin flag, scrollFn - silently sets
+                // nothing and leaves the old value in force. Writing straight to the options object
+                // is the only way to clear those, and it also avoids the option listeners, one of
+                // which calls toLowerCase on a pristine multiDragKey of null.
+                const pristine = pristineDefaults[key];
+                if (pristine === undefined) {
+                    state.sortable.options[key] = undefined;
+                    continue;
+                }
+
+                state.sortable.option(key, pristine);
             }
 
             for (const [key, value] of Object.entries(normalized)) {
@@ -98,24 +113,39 @@ export async function create(id, dotNetReference, defaultOptions, componentOptio
     };
 }
 
-// SortableJS exposes no table of its own defaults, so read them off a throwaway instance built with
-// no options at all. Resetting a cleared option to undefined would not do: SortableJS stores the
-// value verbatim, and several of its code paths test the property rather than its truthiness.
-let pristineDefaultsCache = null;
-function pristineDefaults(Sortable) {
-    if (pristineDefaultsCache) {
-        return pristineDefaultsCache;
+// SortableJS publishes no table of its own defaults, so they are read off a throwaway instance built
+// with no options at all.
+//
+// Captured when a list is created, never on demand. SortableJS's destroy() calls _onDrop(), which
+// clears its module-global active-drag state regardless of which instance is being destroyed, so
+// building and destroying this probe during a drag would abandon that drag: no drop, no end event,
+// and the DOM left half-moved. Creation happens on a component's first render, where no drag can be
+// in flight.
+let pristineDefaults = {};
+let hasPristineDefaults = false;
+function capturePristineDefaults(Sortable) {
+    if (hasPristineDefaults) {
+        return;
     }
 
     const probe = document.createElement("div");
     const instance = new Sortable(probe, {});
-    pristineDefaultsCache = { ...instance.options };
+    pristineDefaults = { ...instance.options };
     instance.destroy();
-    return pristineDefaultsCache;
+    hasPristineDefaults = true;
 }
 
 function buildOptions(state, defaultOptions, componentOptions) {
     const values = mergeDefined(defaultOptions, componentOptions);
+
+    // The event handlers read this rather than closing over `values`. update() deliberately skips
+    // every on* key - reassigning handlers mid-drag is not safe - so a handler built at creation
+    // would keep the option values it was born with. Enabling ShouldRemoveOnSpill later then had
+    // the plugin delete the row while the stale handler reported isSpillRemoval false, leaving the
+    // item in the collection and Blazor rendering against a node that is no longer there.
+    state.values = values;
+
+
     const options = {};
     assign(options, "group", mapGroup(state, values.group));
     assign(options, "sort", values.isSortingEnabled);
@@ -169,7 +199,7 @@ function buildOptions(state, defaultOptions, componentOptions) {
     assign(options, "multiDragKey", mapMultiDragKey(values.multiDragKey));
     assign(options, "avoidImplicitDeselect", values.shouldAvoidImplicitDeselect);
     options.setData = (dataTransfer, dragElement) => {
-        dataTransfer.setData("Text", values.setDataText ?? dragElement.getAttribute(setDataTextAttribute) ?? dragElement.textContent ?? "");
+        dataTransfer.setData("Text", state.values.setDataText ?? dragElement.getAttribute(setDataTextAttribute) ?? dragElement.textContent ?? "");
     };
 
     for (const eventName of eventNames) {
@@ -177,13 +207,35 @@ function buildOptions(state, defaultOptions, componentOptions) {
             // SortableJS appends its fallback ghost (and may insert plugin clones) before
             // dispatching "start". "choose" runs before those child-list mutations, so this
             // snapshot contains only the DOM that Blazor last rendered.
+            const queueAction = resolveQueueOwner(eventName, hasDragStarted);
             if (eventName === "choose") {
-                captureSnapshots(state);
-                dragToken++;
-                activeDragQueue = Promise.resolve();
+                captureSnapshots();
             }
 
-            const payload = createPayload(eventName, event, state.id, values);
+            if (eventName === "start") {
+                hasDragStarted = true;
+            }
+
+            if (queueAction === "open") {
+                dragToken++;
+                hasDragStarted = false;
+
+                // Continue a chain that is still draining rather than starting a fresh one. The
+                // previous drag's handlers can still be in flight - a network round trip each on
+                // Blazor Server - and a second chain would let this drag's mutations reach .NET
+                // first. Both drags then apply against indexes taken from a list the other has
+                // already changed, which duplicates one item and drops another.
+                activeDragQueue = activeDragQueue ?? Promise.resolve();
+            }
+
+            // "end" also closes, but only after its own event has been enqueued, so it is handled
+            // further down rather than here.
+            if (queueAction === "close" && eventName === "unchoose") {
+                closeDragQueue();
+                dragSnapshots.clear();
+            }
+
+            const payload = createPayload(eventName, event, state.id, state.values);
 
             // "spill" is raised before the OnSpill plugin has finished with the DOM: with
             // removeOnSpill it goes on to delete the row after this callback returns. Restoring
@@ -270,42 +322,19 @@ function closeDragQueue() {
     });
 }
 
-// Snapshot breadth is a correctness question first: rollback has to cover every list the drag can
-// reach, including ancestors and descendants for nested trees. Only lists provably out of reach -
-// a different named group, no containment relationship - are skipped. An unnamed group tells us
-// nothing, so those are still snapshotted.
-function captureSnapshots(sourceState) {
+// Every registered list, deliberately.
+//
+// Narrowing this by group name is unsound: PutMode.Enabled maps to `put: true`, and SortableJS's
+// own check returns true for `true` before it ever compares names, so two lists with different
+// names accept each other. Group arrays and the synchronous predicates cross names too. What is
+// left to exclude - a list whose put is explicitly disabled - is not worth the risk, because a list
+// wrongly skipped is absent from the snapshot, rollback can only restore what it snapshotted, and
+// the DOM then stays diverged from the model with nothing left to correct it.
+function captureSnapshots() {
     dragSnapshots.clear();
     for (const state of instances.values()) {
-        if (canReceiveDragFrom(sourceState, state)) {
-            dragSnapshots.set(state.element, Array.from(state.element.children));
-        }
+        dragSnapshots.set(state.element, Array.from(state.element.children));
     }
-}
-
-function canReceiveDragFrom(sourceState, candidateState) {
-    if (candidateState === sourceState) {
-        return true;
-    }
-
-    const source = sourceState.element;
-    const candidate = candidateState.element;
-    if (source.contains(candidate) || candidate.contains(source)) {
-        return true;
-    }
-
-    const sourceGroup = groupNameOf(sourceState);
-    const candidateGroup = groupNameOf(candidateState);
-    if (!sourceGroup || !candidateGroup) {
-        return true;
-    }
-
-    return sourceGroup === candidateGroup;
-}
-
-function groupNameOf(state) {
-    const group = state.sortable?.options?.group;
-    return typeof group === "string" ? group : group?.name;
 }
 
 function restoreSnapshots() {
@@ -400,11 +429,14 @@ function mapGroup(state, group) {
             ? group.putGroups
             : true;
     // A configured predicate wins over the fixed mode: it is strictly more specific, and a consumer
-    // who supplied both meant the code to decide.
+    // who supplied both meant the code to decide. A permitted pull answers with the configured mode
+    // rather than plain true, because returning true where the mode is "clone" downgrades the whole
+    // transfer to a move: SortableJS reports pullMode true, so nothing is recognised as a clone, the
+    // CloneFunction never runs, and the original is taken out of the source list.
     return {
         name: group.name,
         pull: state.decisions.hasPullDecision
-            ? (to, from, dragged) => decideSynchronously(state, "DecidePull", groupRequest(to, from, dragged), true)
+            ? (to, from, dragged) => decideSynchronously(state, "DecidePull", groupRequest(to, from, dragged), true) && pull
             : pull,
         put: state.decisions.hasPutDecision
             ? (to, from, dragged) => decideSynchronously(state, "DecidePut", groupRequest(to, from, dragged), true)

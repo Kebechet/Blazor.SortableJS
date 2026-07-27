@@ -242,21 +242,20 @@ public sealed class Sortable<TItem> : ComponentBase, IAsyncDisposable, ISortable
     private sealed record SortableDecisionFlags(bool HasMoveDecision, bool HasPutDecision, bool HasPullDecision);
 
     /// <inheritdoc />
-    protected override void OnParametersSet()
-    {
-        // Not OnAfterRender(firstRender): a decision assigned later - a parameter that only becomes
-        // non-null once some state flips - would slip past a first-render-only check and then never
-        // take effect, which is the silent no-op this guard exists to prevent.
-        GuardSynchronousDecisions();
-    }
-
-    /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (_isDisposed)
         {
             return;
         }
+
+        // Deliberately here rather than in OnParametersSet, and on every render rather than only the
+        // first. OnParametersSet also runs while a WebAssembly app is being prerendered on the
+        // server, where IsBrowser is false, so the guard would reject a perfectly valid app before
+        // it ever reached the browser. OnAfterRender does not run during prerendering. Checking
+        // every render, not just the first, still catches a decision assigned later - which would
+        // otherwise slip past and silently never take effect.
+        GuardSynchronousDecisions();
 
         if (firstRender)
         {
@@ -567,20 +566,28 @@ public sealed class Sortable<TItem> : ComponentBase, IAsyncDisposable, ISortable
     }
 
     /// <summary>
-    /// Resolves an index reported by JavaScript against this component's own collection.
+    /// Resolves an index reported by JavaScript against the list that JavaScript named.
     /// </summary>
     /// <remarks>
-    /// The index belongs to whichever list JavaScript named, so it only means anything here when
-    /// that list is this one. Resolving it blindly would hand the caller an unrelated neighbour.
+    /// It cannot just read this component's own collection. DecidePut runs on the destination while
+    /// the dragged item still belongs to the source, so a local lookup handed every put predicate a
+    /// null item; cross-list DecideMove has the mirror problem for the item under the pointer. The
+    /// registry knows every list, so the owning one answers. A list of another item type yields
+    /// null rather than a wrong item.
     /// </remarks>
     private TItem? ItemAt(int index, string listId)
     {
-        if (Items is null || !string.Equals(listId, _resolvedId, StringComparison.Ordinal))
+        if (index < 0)
         {
             return default;
         }
 
-        return index >= 0 && index < Items.Count ? Items[index] : default;
+        if (string.Equals(listId, _resolvedId, StringComparison.Ordinal))
+        {
+            return Items is not null && index < Items.Count ? Items[index] : default;
+        }
+
+        return _registry?.ReadItem(listId, index) is TItem item ? item : default;
     }
 
     /// <summary>

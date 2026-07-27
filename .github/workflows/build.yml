@@ -29,6 +29,11 @@ jobs:
     - name: Build
       run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore --configuration ${{ env.BUILD_CONFIGURATION }}
 
+    # bUnit never executes sortable-interop.js, so without this step nothing but a browser run
+    # stands behind the interop module's logic.
+    - name: Test the interop module
+      run: node --test tests/interop/*.test.mjs
+
     - name: Test with coverage
       run: dotnet test ${{ env.SOLUTION_PATH }} --no-build --configuration ${{ env.BUILD_CONFIGURATION }} --collect:"XPlat Code Coverage" --results-directory ./coverage
 

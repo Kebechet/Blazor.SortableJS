@@ -147,6 +147,24 @@ public sealed class SortableDecisionTests
         exception.Message.ShouldContain(nameof(Sortable<string>.CanAcceptItem));
     }
 
+    [Fact]
+    public void A_decision_assigned_after_the_first_render_still_fails_loudly()
+    {
+        // Arrange
+        using var context = new TestContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var component = context.RenderComponent<Sortable<string>>(parameters => parameters
+            .Add(child => child.Items, new List<string> { "alpha" })
+            .Add(child => child.ItemTemplate, item => builder => builder.AddContent(0, item)));
+
+        // Act
+        var assignLater = () => component.SetParametersAndRender(parameters => parameters
+            .Add(child => child.MoveDecision, _ => SortableMoveDecision.Reject));
+
+        // Assert
+        Should.Throw<PlatformNotSupportedException>(assignLater);
+    }
+
     private static Sortable<string> Create()
     {
         return new Sortable<string> { Items = new List<string> { "alpha", "bravo", "charlie" } };

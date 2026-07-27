@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Runtime.CompilerServices;
 using Shouldly;
 using Xunit;
@@ -30,6 +31,8 @@ public class PackagingTests
     [Theory]
     [InlineData("Sortable.min.js")]
     [InlineData("Kebechet.Blazor.SortableJS.lib.module.js")]
+    [InlineData("sortable-interop.js")]
+    [InlineData("sortable-policy.js")]
     public void Static_web_asset_is_present(string fileName)
     {
         // Arrange
@@ -40,6 +43,37 @@ public class PackagingTests
 
         // Assert
         doesAssetExist.ShouldBeTrue($"'{fileName}' is missing from src/Blazor.SortableJS/wwwroot.");
+    }
+
+    /// <summary>
+    /// Every relative import in a shipped module must resolve to another shipped file.
+    /// </summary>
+    /// <remarks>
+    /// A module split across files only works if all of them reach the consumer. A missing one fails
+    /// at load time in the browser, long after any build or unit test would have noticed.
+    /// </remarks>
+    [Fact]
+    public void Every_relative_import_resolves_to_a_shipped_file()
+    {
+        // Arrange
+        var modulePaths = Directory.GetFiles(_wwwrootDirectory, "*.js");
+        var importPattern = new Regex("""from\s+["'](?<path>\.[^"']+)["']""");
+
+        // Act
+        var missingImports = modulePaths
+            .SelectMany(modulePath => importPattern
+                .Matches(File.ReadAllText(modulePath))
+                .Select(match => new
+                {
+                    Module = Path.GetFileName(modulePath),
+                    Target = Path.GetFullPath(Path.Combine(_wwwrootDirectory, match.Groups["path"].Value))
+                }))
+            .Where(import => !File.Exists(import.Target))
+            .Select(import => $"{import.Module} imports missing '{Path.GetFileName(import.Target)}'")
+            .ToArray();
+
+        // Assert
+        missingImports.ShouldBeEmpty();
     }
 
     [Fact]

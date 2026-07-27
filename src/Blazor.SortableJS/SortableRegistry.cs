@@ -60,6 +60,17 @@ internal sealed class SortableRegistry
         return Array.Empty<object?>();
     }
 
+    /// <summary>Reads one item from whichever registered list owns the given id.</summary>
+    internal object? ReadItem(string listId, int index)
+    {
+        if (!_containers.TryGetValue(listId, out var container))
+        {
+            return null;
+        }
+
+        return container.ReadItems(new[] { index }).FirstOrDefault();
+    }
+
     internal SortableOperationPlan? Prepare(SortableJsEvent sortableEvent)
     {
         if (!_containers.TryGetValue(sortableEvent.SourceId, out var source) ||
@@ -116,15 +127,9 @@ internal sealed class SortableRegistry
             return;
         }
 
-        if (sortableEvent.IsSwap && ReferenceEquals(source, destination) && sortableEvent.NewIndexes.Length > 0)
+        if (sortableEvent.IsSwap && sortableEvent.NewIndexes.Length > 0)
         {
-            var newIndex = sortableEvent.NewIndexes[0];
-            if (newIndex >= 0 && newIndex < source.Count)
-            {
-                source.Swap(plan.OldIndexes[0], newIndex);
-                source.RequestRender();
-            }
-
+            ApplySwap(plan, sortableEvent.NewIndexes[0]);
             return;
         }
 
@@ -167,6 +172,55 @@ internal sealed class SortableRegistry
         {
             destination.RequestRender();
         }
+    }
+
+    /// <summary>
+    /// Exchanges the dragged item with the one it was dropped onto, in one list or across two.
+    /// </summary>
+    /// <remarks>
+    /// The cross-list case used to fall through to the ordinary transfer path, which removes from
+    /// the source and inserts what the plan carries - and a swap plan carries nothing, because the
+    /// Swap plugin exchanges positions rather than moving an item. The dragged item was therefore
+    /// deleted outright and its counterpart never moved. See <c>SortableSwapTests</c>.
+    /// </remarks>
+    private static void ApplySwap(SortableOperationPlan plan, int newIndex)
+    {
+        var source = plan.Source;
+        var destination = plan.Destination;
+        var oldIndex = plan.OldIndexes[0];
+        if (ReferenceEquals(source, destination))
+        {
+            if (newIndex >= 0 && newIndex < source.Count)
+            {
+                source.Swap(oldIndex, newIndex);
+                source.RequestRender();
+            }
+
+            return;
+        }
+
+        if (newIndex < 0 || newIndex >= destination.Count)
+        {
+            return;
+        }
+
+        // Each list has to accept what the other is handing it. If either declines, neither is
+        // touched - a half-applied swap would duplicate one item and lose the other.
+        var outgoing = plan.SourceItems.FirstOrDefault();
+        var incoming = destination.ReadItems(new[] { newIndex }).FirstOrDefault();
+        if (!destination.TryConvertIncoming(outgoing, false, out var convertedOutgoing) ||
+            !source.TryConvertIncoming(incoming, false, out var convertedIncoming))
+        {
+            return;
+        }
+
+        destination.RemoveAt(newIndex);
+        destination.Insert(newIndex, convertedOutgoing);
+        source.RemoveAt(oldIndex);
+        source.Insert(oldIndex, convertedIncoming);
+        destination.LastMovedItems = new[] { convertedOutgoing };
+        source.RequestRender();
+        destination.RequestRender();
     }
 
     private static IReadOnlyList<int> ValidDistinctIndexes(IEnumerable<int> indexes, int count)
