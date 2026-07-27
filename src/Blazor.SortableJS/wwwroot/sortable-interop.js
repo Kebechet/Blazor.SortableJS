@@ -8,6 +8,7 @@ const eventNames = [
 const instances = new Map();
 const dragSnapshots = new Map();
 let eventQueue = Promise.resolve();
+let hasDeferredSpill = false;
 
 export async function create(id, dotNetReference, defaultOptions, componentOptions) {
     const Sortable = await waitForSortable();
@@ -16,7 +17,7 @@ export async function create(id, dotNetReference, defaultOptions, componentOptio
         throw new Error(`Cannot initialize SortableJS because element '${id}' was not found.`);
     }
 
-    const state = { id, element, dotNetReference, sortable: null, appliedKeys: new Set() };
+    const state = { id, element, dotNetReference, sortable: null, appliedKeys: new Set(), isDestroyed: false };
     const options = buildOptions(state, defaultOptions, componentOptions);
     state.sortable = new Sortable(element, options);
     state.appliedKeys = new Set(Object.keys(options).filter(key => !key.startsWith("on")));
@@ -36,6 +37,10 @@ export async function create(id, dotNetReference, defaultOptions, componentOptio
             if (!state.sortable) {
                 return;
             }
+
+            // Events already dispatched would otherwise reach a DotNetObjectReference that .NET has
+            // disposed, which throws "There is no tracked object with id ..." from the JS side.
+            state.isDestroyed = true;
 
             state.sortable.destroy();
             state.sortable = null;
@@ -110,11 +115,38 @@ function buildOptions(state, defaultOptions, componentOptions) {
             }
 
             const payload = createPayload(eventName, event, state.id, values);
-            if (eventName === "add" || eventName === "update" || eventName === "remove" || eventName === "spill") {
+
+            // "spill" is raised before the OnSpill plugin has finished with the DOM: with
+            // removeOnSpill it goes on to delete the row after this callback returns. Restoring
+            // synchronously re-inserts a node SortableJS then removes again, leaving Blazor to
+            // render against a detached element ("Cannot read properties of null (removeChild)").
+            // Deferring puts the restore after SortableJS is done.
+            if (eventName === "spill") {
+                hasDeferredSpill = true;
+                setTimeout(() => {
+                    restoreSnapshots();
+                    enqueueEvent(state, payload);
+                }, 0);
+                return;
+            }
+
+            if (eventName === "add" || eventName === "update" || eventName === "remove") {
                 restoreSnapshots();
             }
 
-            enqueueEvent(state.dotNetReference, payload);
+            if (eventName === "end" && hasDeferredSpill) {
+                // "end" fires synchronously after "spill", so notifying .NET here would arrive
+                // before the deferred spill and the mutation would be applied out of order.
+                // Queue behind it, then release the snapshots.
+                hasDeferredSpill = false;
+                setTimeout(() => {
+                    enqueueEvent(state, payload);
+                    dragSnapshots.clear();
+                }, 0);
+                return;
+            }
+
+            enqueueEvent(state, payload);
             if (eventName === "end") {
                 dragSnapshots.clear();
             }
@@ -156,6 +188,13 @@ function captureSnapshots() {
 
 function restoreSnapshots() {
     for (const [element, snapshot] of dragSnapshots) {
+        // A list can be torn down mid-drag - on a docs page several stories mount and unmount
+        // together. Re-inserting nodes into a detached container leaves Blazor holding elements
+        // whose parent is gone, which surfaces as "Cannot read properties of null (removeChild)".
+        if (!element.isConnected) {
+            continue;
+        }
+
         const expected = new Set(snapshot);
         for (const child of Array.from(element.children)) {
             if (!expected.has(child)) {
@@ -172,9 +211,12 @@ function restoreSnapshots() {
     }
 }
 
-function enqueueEvent(dotNetReference, payload) {
+// The queue defers execution, so a component can be disposed between an event being queued and
+// the queue reaching it. Checking `isDestroyed` only in the handler is too early: re-check here,
+// or the invoke lands on a DotNetObjectReference .NET has already released.
+function enqueueEvent(state, payload) {
     eventQueue = eventQueue
-        .then(() => dotNetReference.invokeMethodAsync("HandleEventAsync", payload))
+        .then(() => state.isDestroyed ? undefined : state.dotNetReference.invokeMethodAsync("HandleEventAsync", payload))
         .catch(error => console.error("Kebechet.Blazor.SortableJS event callback failed.", error));
 }
 
