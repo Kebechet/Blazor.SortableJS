@@ -105,7 +105,9 @@ They are **observational**. SortableJS reads the return value of `onMove`, `grou
 
 `MoveDecision` can reject a move or force insertion before or after the item under the pointer; `CanAcceptItem` and `CanReleaseItem` are the per-item `put` and `pull` predicates the fixed group modes cannot express.
 
-These need synchronous interop and so are **WebAssembly only**. Setting one under Blazor Server throws `PlatformNotSupportedException` rather than silently never taking effect.
+`CanAcceptItem` and `CanReleaseItem` work everywhere. They are wired to the SortableJS group functions on WebAssembly, so the drag is refused as the pointer moves, and they are enforced again in .NET when the drop is applied - which is what makes them hold on Blazor Server, and for **every** item of a MultiDrag selection rather than only the one under the pointer, since SortableJS asks its group functions about that one alone.
+
+`MoveDecision` is **WebAssembly only**: it steers where an item lands while the pointer is still moving, which nothing can do after the fact. Setting it under Blazor Server throws `PlatformNotSupportedException` rather than silently never taking effect.
 
 ## Coverage vs. SortableJS 1.15.7
 

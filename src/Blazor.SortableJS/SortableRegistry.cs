@@ -86,6 +86,26 @@ internal sealed class SortableRegistry
         }
 
         var sourceItems = source.ReadItems(oldIndexes);
+
+        // Every moved item is checked, not just the one under the pointer. SortableJS calls the
+        // group pull/put functions once, with the primary dragged element, so a MultiDrag selection
+        // pairing an allowed row with a forbidden one was approved wholesale on the strength of the
+        // allowed one. Re-checking here also makes the predicates work on Blazor Server, where the
+        // JavaScript-side call cannot happen at all. See SortableTransferPolicyTests.
+        if (!ReferenceEquals(source, destination))
+        {
+            for (var position = 0; position < sourceItems.Count; position++)
+            {
+                var item = sourceItems[position];
+                var index = oldIndexes[position];
+                if (!source.CanRelease(item, sortableEvent.SourceId, sortableEvent.DestinationId, index) ||
+                    !destination.CanAccept(item, sortableEvent.SourceId, sortableEvent.DestinationId, index))
+                {
+                    return null;
+                }
+            }
+        }
+
         IReadOnlyList<object?> destinationItems = Array.Empty<object?>();
         if (!sortableEvent.IsSpillRemoval && !sortableEvent.IsSwap)
         {
@@ -267,6 +287,12 @@ internal interface ISortableContainer
 
     /// <summary>Converts an incoming item, returning false when this list declines to accept it.</summary>
     bool TryConvertIncoming(object? item, bool isClone, out object? converted);
+
+    /// <summary>Asks whether this list accepts an item arriving from another.</summary>
+    bool CanAccept(object? item, string sourceId, string destinationId, int draggedIndex);
+
+    /// <summary>Asks whether this list lets one of its items leave.</summary>
+    bool CanRelease(object? item, string sourceId, string destinationId, int draggedIndex);
     void RemoveAt(int index);
     void Insert(int index, object? item);
     void Swap(int firstIndex, int secondIndex);

@@ -130,7 +130,7 @@ public sealed class SortableDecisionTests
     }
 
     [Fact]
-    public void Configuring_a_decision_off_webassembly_fails_loudly()
+    public void Configuring_a_move_decision_off_webassembly_fails_loudly()
     {
         // Arrange
         using var context = new TestContext();
@@ -139,12 +139,29 @@ public sealed class SortableDecisionTests
         // Act
         var render = () => context.RenderComponent<Sortable<string>>(parameters => parameters
             .Add(child => child.Items, new List<string> { "alpha" })
-            .Add(child => child.CanAcceptItem, _ => true)
+            .Add(child => child.MoveDecision, _ => SortableMoveDecision.Reject)
             .Add(child => child.ItemTemplate, item => builder => builder.AddContent(0, item)));
 
         // Assert
         var exception = Should.Throw<PlatformNotSupportedException>(render);
-        exception.Message.ShouldContain(nameof(Sortable<string>.CanAcceptItem));
+        exception.Message.ShouldContain(nameof(Sortable<string>.MoveDecision));
+    }
+
+    [Fact]
+    public void A_transfer_predicate_works_without_webassembly()
+    {
+        // Arrange & Act - only MoveDecision needs synchronous interop. The transfer predicates are
+        // enforced in .NET when the drop is applied, so a test host, and Blazor Server, can use them.
+        using var context = new TestContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var render = () => context.RenderComponent<Sortable<string>>(parameters => parameters
+            .Add(child => child.Items, new List<string> { "alpha" })
+            .Add(child => child.CanAcceptItem, _ => true)
+            .Add(child => child.CanReleaseItem, _ => true)
+            .Add(child => child.ItemTemplate, item => builder => builder.AddContent(0, item)));
+
+        // Assert
+        Should.NotThrow(render);
     }
 
     [Fact]

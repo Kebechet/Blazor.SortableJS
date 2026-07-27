@@ -134,15 +134,16 @@ public sealed class Sortable<TItem> : ComponentBase, IAsyncDisposable, ISortable
     /// <summary>Gets or sets a synchronous predicate deciding whether this list accepts an item.</summary>
     /// <remarks>
     /// Maps to the SortableJS group <c>put</c> function, allowing per-item and per-source decisions
-    /// that the fixed group modes cannot express. WebAssembly only, as for <see cref="MoveDecision"/>.
+    /// that the fixed group modes cannot express. Enforced in .NET when the drop is applied, so it
+    /// holds on every platform and for every item of a MultiDrag selection, not only the primary one.
     /// </remarks>
     [Parameter]
     public Func<SortableTransferContext<TItem>, bool>? CanAcceptItem { get; set; }
 
     /// <summary>Gets or sets a synchronous predicate deciding whether an item may leave this list.</summary>
     /// <remarks>
-    /// Maps to the SortableJS group <c>pull</c> function. WebAssembly only, as for
-    /// <see cref="MoveDecision"/>.
+    /// Maps to the SortableJS group <c>pull</c> function. Enforced in .NET as well, as for
+    /// <see cref="CanAcceptItem"/>.
     /// </remarks>
     [Parameter]
     public Func<SortableTransferContext<TItem>, bool>? CanReleaseItem { get; set; }
@@ -556,12 +557,21 @@ public sealed class Sortable<TItem> : ComponentBase, IAsyncDisposable, ISortable
 
     private SortableTransferContext<TItem> CreateTransferContext(SortableDecisionRequest request)
     {
+        return CreateTransferContext(
+            ItemAt(request.DraggedIndex, request.SourceId),
+            request.SourceId,
+            request.DestinationId,
+            request.DraggedIndex);
+    }
+
+    private static SortableTransferContext<TItem> CreateTransferContext(object? item, string sourceId, string destinationId, int draggedIndex)
+    {
         return new SortableTransferContext<TItem>
         {
-            SourceId = request.SourceId,
-            DestinationId = request.DestinationId,
-            Item = ItemAt(request.DraggedIndex, request.SourceId),
-            DraggedIndex = request.DraggedIndex
+            SourceId = sourceId,
+            DestinationId = destinationId,
+            Item = item is TItem typedItem ? typedItem : default,
+            DraggedIndex = draggedIndex
         };
     }
 
@@ -600,22 +610,20 @@ public sealed class Sortable<TItem> : ComponentBase, IAsyncDisposable, ISortable
     /// </remarks>
     private void GuardSynchronousDecisions()
     {
-        if (MoveDecision is null && CanAcceptItem is null && CanReleaseItem is null)
-        {
-            return;
-        }
-
-        if (OperatingSystem.IsBrowser())
+        // Only MoveDecision. It steers where an item lands while the pointer is still moving, which
+        // nothing can do after the fact. CanAcceptItem and CanReleaseItem are also enforced in .NET
+        // when the drop is applied, so on Blazor Server they still refuse the transfer - the drag
+        // just is not rejected visually on the way. Working with less feedback beats not working.
+        if (MoveDecision is null || OperatingSystem.IsBrowser())
         {
             return;
         }
 
         throw new PlatformNotSupportedException(
-            $"{nameof(MoveDecision)}, {nameof(CanAcceptItem)} and {nameof(CanReleaseItem)} need synchronous " +
-            "interop, which is only available on WebAssembly. SortableJS reads the returned value " +
-            "immediately, so under Blazor Server the decision would arrive too late and be ignored. " +
-            $"Use {nameof(SortableOptions.Group)} for a fixed policy, or {nameof(TryConvertFunction)} " +
-            "to refuse an item once it has been dropped.");
+            $"{nameof(MoveDecision)} needs synchronous interop, which is only available on WebAssembly. " +
+            "SortableJS reads the returned value immediately, so under Blazor Server the decision " +
+            $"would arrive too late and be ignored. {nameof(CanAcceptItem)} and {nameof(CanReleaseItem)} " +
+            $"work on every platform, and {nameof(TryConvertFunction)} can refuse an item once dropped.");
     }
 
     private string? ResolveItemClass(TItem item)
@@ -686,6 +694,16 @@ public sealed class Sortable<TItem> : ComponentBase, IAsyncDisposable, ISortable
         throw new InvalidOperationException(
             $"Cannot move an item of type '{item?.GetType().FullName ?? "null"}' into Sortable<{typeof(TItem).FullName}>. " +
             $"Set {nameof(TryConvertFunction)} or {nameof(ConvertFunction)} on the destination component.");
+    }
+
+    bool ISortableContainer.CanAccept(object? item, string sourceId, string destinationId, int draggedIndex)
+    {
+        return CanAcceptItem is null || CanAcceptItem(CreateTransferContext(item, sourceId, destinationId, draggedIndex));
+    }
+
+    bool ISortableContainer.CanRelease(object? item, string sourceId, string destinationId, int draggedIndex)
+    {
+        return CanReleaseItem is null || CanReleaseItem(CreateTransferContext(item, sourceId, destinationId, draggedIndex));
     }
 
     void ISortableContainer.RemoveAt(int index)

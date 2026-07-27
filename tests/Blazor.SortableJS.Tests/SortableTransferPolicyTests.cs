@@ -136,6 +136,86 @@ public sealed class SortableTransferPolicyTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task A_refused_item_blocks_the_whole_multidrag_selection()
+    {
+        // Arrange - SortableJS asks the group put function once, about the primary dragged row, so
+        // a forbidden row selected alongside an allowed one used to travel with it.
+        var source = new List<string> { "allowed", "forbidden" };
+        var destination = new List<string>();
+        RenderStrings("source", source);
+        var destinationComponent = _context.RenderComponent<Sortable<string>>(parameters => parameters
+            .Add(component => component.Id, "destination")
+            .Add(component => component.Items, destination)
+            .Add(component => component.CanAcceptItem, context => context.Item != "forbidden")
+            .Add(component => component.ItemTemplate, item => builder => builder.AddContent(0, item)));
+
+        // Act
+        await destinationComponent.InvokeAsync(() => destinationComponent.Instance.HandleEventAsync(new SortableJsEvent
+        {
+            EventName = "add",
+            SourceId = "source",
+            DestinationId = "destination",
+            OldIndexes = [0, 1],
+            NewIndexes = [0, 1]
+        }));
+
+        // Assert
+        source.ShouldBe(["allowed", "forbidden"]);
+        destination.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_permitted_multidrag_selection_transfers_completely()
+    {
+        // Arrange
+        var source = new List<string> { "first", "second" };
+        var destination = new List<string>();
+        RenderStrings("source", source);
+        var destinationComponent = _context.RenderComponent<Sortable<string>>(parameters => parameters
+            .Add(component => component.Id, "destination")
+            .Add(component => component.Items, destination)
+            .Add(component => component.CanAcceptItem, _ => true)
+            .Add(component => component.ItemTemplate, item => builder => builder.AddContent(0, item)));
+
+        // Act
+        await destinationComponent.InvokeAsync(() => destinationComponent.Instance.HandleEventAsync(new SortableJsEvent
+        {
+            EventName = "add",
+            SourceId = "source",
+            DestinationId = "destination",
+            OldIndexes = [0, 1],
+            NewIndexes = [0, 1]
+        }));
+
+        // Assert
+        source.ShouldBeEmpty();
+        destination.ShouldBe(["first", "second"]);
+    }
+
+    [Fact]
+    public async Task A_source_can_keep_an_item_that_may_not_leave()
+    {
+        // Arrange
+        var source = new List<string> { "pinned" };
+        var destination = new List<string>();
+        var sourceComponent = _context.RenderComponent<Sortable<string>>(parameters => parameters
+            .Add(component => component.Id, "source")
+            .Add(component => component.Items, source)
+            .Add(component => component.CanReleaseItem, context => context.Item != "pinned")
+            .Add(component => component.ItemTemplate, item => builder => builder.AddContent(0, item)));
+        var destinationComponent = RenderStrings("destination", destination);
+
+        // Act
+        await destinationComponent.InvokeAsync(() => destinationComponent.Instance.HandleEventAsync(
+            AddEvent("source", "destination")));
+
+        // Assert
+        source.ShouldBe(["pinned"]);
+        destination.ShouldBeEmpty();
+        sourceComponent.Instance.ShouldNotBeNull();
+    }
+
     private static bool TryConvertNothing(object item, out int converted)
     {
         converted = default;
