@@ -25,6 +25,16 @@ public sealed class DemoFixture : IAsyncLifetime
     public IBrowser Browser { get; private set; } = null!;
     public IPage Page { get; private set; } = null!;
 
+    /// <summary>
+    /// Unhandled JavaScript errors and Blazor render exceptions seen since the last navigation.
+    /// </summary>
+    /// <remarks>
+    /// Every DOM-reconciliation defect found in this library announced itself here and nowhere
+    /// else: the model stayed correct, the drag still "worked", and only the console showed that
+    /// Blazor had thrown. A suite that ignores the console cannot see them.
+    /// </remarks>
+    private readonly List<string> _jsErrors = new();
+
     public async ValueTask InitializeAsync()
     {
         var repositoryRoot = FindRepositoryRoot();
@@ -68,10 +78,66 @@ public sealed class DemoFixture : IAsyncLifetime
             Headless = true,
             Args = ["--disable-dev-shm-usage"]
         });
+        await CreatePageAsync();
+    }
+
+    /// <summary>
+    /// Replaces <see cref="Page"/> with a fresh one.
+    /// </summary>
+    /// <remarks>
+    /// Tests share this fixture, and a page carries state a drag can trip over: the pointer's
+    /// position, a half-finished SortableJS interaction, listeners from the previous story. One
+    /// page per scenario removes that as a source of intermittent failures.
+    /// </remarks>
+    private async Task CreatePageAsync()
+    {
+        if (Page is not null)
+        {
+            await Page.CloseAsync();
+        }
+
         Page = await Browser.NewPageAsync(new BrowserNewPageOptions
         {
             ViewportSize = new ViewportSize { Width = 1440, Height = 1000 }
         });
+
+        Page.Console += (_, message) =>
+        {
+            if (message.Type == "error" && !IsUnrelatedNoise(message.Text))
+            {
+                lock (_jsErrors) _jsErrors.Add(FirstLine(message.Text));
+            }
+        };
+        Page.PageError += (_, error) =>
+        {
+            lock (_jsErrors) _jsErrors.Add(FirstLine(error));
+        };
+    }
+
+    /// <summary>
+    /// Fails the current test if the page logged an unhandled JavaScript or Blazor render error.
+    /// </summary>
+    public void AssertNoJsErrors()
+    {
+        string[] errors;
+        lock (_jsErrors) errors = _jsErrors.Distinct().ToArray();
+        Assert.True(
+            errors.Length == 0,
+            "The page reported unhandled errors:" + Environment.NewLine + string.Join(Environment.NewLine, errors));
+    }
+
+    private static string FirstLine(string text)
+    {
+        var lines = text.Split(Environment.NewLine.ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
+        return lines.Length == 0 ? text : lines[0];
+    }
+
+    /// <summary>Browser-extension chatter and asset noise that says nothing about this library.</summary>
+    private static bool IsUnrelatedNoise(string text)
+    {
+        return text.Contains("contentscript")
+            || text.Contains("Failed to load resource")
+            || text.Contains("preloaded using link preload");
     }
 
     public async ValueTask DisposeAsync()
@@ -109,6 +175,7 @@ public sealed class DemoFixture : IAsyncLifetime
     /// </remarks>
     public async Task<ILocator> NavigateToStoryAsync(string storyId)
     {
+        lock (_jsErrors) _jsErrors.Clear();
         var url = $"{BaseUrl}/iframe.html?viewMode=story&id={storyId}&args=ForceFallback:true&e2e={Guid.NewGuid():N}";
         await Page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
 
@@ -123,6 +190,19 @@ public sealed class DemoFixture : IAsyncLifetime
         // drag, which Playwright cannot drive - every drag below would then fail for the wrong reason.
         var fallbackValue = await canvas.Locator("[data-fallback-forced]").First.GetAttributeAsync("data-fallback-forced");
         Assert.Equal("true", fallbackValue?.ToLowerInvariant());
+
+        // The model panel renders before the component's OnAfterRenderAsync has imported the
+        // interop module and constructed the SortableJS instances. A drag started in that window
+        // is silently inert, which shows up later as an intermittent "model never changed".
+        await Page.WaitForFunctionAsync(
+            @"() => {
+                if (!window.Sortable) return false;
+                const lists = new Set(Array.from(document.querySelectorAll('[data-sortable-item]')).map(e => e.parentElement));
+                return lists.size > 0 && Array.from(lists).every(l => !!window.Sortable.get(l));
+            }",
+            null,
+            new PageWaitForFunctionOptions { Timeout = 30_000 });
+
         return canvas;
     }
 

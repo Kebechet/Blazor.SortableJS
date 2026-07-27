@@ -8,11 +8,13 @@ namespace Blazor.SortableJS.E2E;
 public sealed class SortableDragTests(DemoFixture fixture)
 {
     private const string BasicStory = "sortablejs-basic--reorder-in-place";
-    private const string GroupsStory = "sortablejs-features--connected-groups-with-pull-and-put-policies";
-    private const string NestingStory = "sortablejs-features--arbitrarily-nested-lists";
-    private const string MultiDragStory = "sortablejs-features--multidrag";
-    private const string CloneStory = "sortablejs-features--clone-mode";
-    private const string SwapStory = "sortablejs-features--swap-plugin";
+    private const string GroupsStory = "sortablejs-groups--connected-groups-with-pull-and-put-policies";
+    private const string NestingStory = "sortablejs-nesting--arbitrarily-nested-lists";
+    private const string MultiDragStory = "sortablejs-multidrag--multidrag";
+    private const string CloneStory = "sortablejs-clone--clone-mode";
+    private const string SwapStory = "sortablejs-swap--swap-plugin";
+    private const string SpillStory = "sortablejs-onspill--onspill-policies";
+    private const string AutoScrollStory = "sortablejs-auto-scroll--auto-scroll";
 
     [Fact]
     public async Task SameListReorderMutatesTheModelInPlace()
@@ -54,13 +56,13 @@ public sealed class SortableDragTests(DemoFixture fixture)
         var before = await ReadModelAsync(frame);
         var leafIdentity = before.Item("web-children", "components").Identity;
 
-        await DragAsync(frame.GetByTestId("item-components"), frame.GetByTestId("item-libraries"));
+        await DragAsync(frame.GetByTestId("item-components"), frame.GetByTestId("item-archive"));
 
         await AssertInvariantAsync(
             frame,
-            Expected("root", "tree-root", "applications", "components", "libraries"),
+            Expected("root", "tree-root", "applications", "libraries", "components", "archive"),
             Expected("applications-children", "tree-children-applications", "web", "mobile"),
-            Expected("web-children", "tree-children-web"),
+            Expected("web-children", "tree-children-web", "services"),
             Expected("libraries-children", "tree-children-libraries", "sortablejs"));
         var after = await ReadModelAsync(frame);
         Assert.Equal(leafIdentity, after.Item("root", "components").Identity);
@@ -75,7 +77,10 @@ public sealed class SortableDragTests(DemoFixture fixture)
         await frame.GetByTestId("item-charlie").ClickAsync(controlClick);
         await frame.GetByTestId("item-echo").ClickAsync(controlClick);
 
-        await DragAsync(frame.GetByTestId("item-alpha"), frame.GetByTestId("item-foxtrot"), afterTarget: true);
+        // Dropping onto the list rather than its last row: MultiDrag pulls the selected rows out of
+        // the flow, so the last row moves while the drag is in flight and its "after" edge is a
+        // moving target. The container's lower region stays unambiguously past every row.
+        await DragAsync(frame.GetByTestId("item-alpha"), frame.GetByTestId("multidrag-list"), afterTarget: true);
 
         await AssertInvariantAsync(
             frame,
@@ -126,6 +131,140 @@ public sealed class SortableDragTests(DemoFixture fixture)
             Expected("done", "done-list", "scaffold"));
     }
 
+    /// <summary>Which list a row sits in, and where in it - enough to tell whether a drag took.</summary>
+    private static async Task<string> DescribePositionAsync(ILocator row)
+    {
+        return await row.EvaluateAsync<string>(
+            "element => (element.parentElement?.getAttribute('data-testid') ?? '?') + ':' + Array.from(element.parentElement?.children ?? []).indexOf(element)");
+    }
+
+    private async Task<bool> HasDraggedElementMovedAsync(string originalSignature)
+    {
+        var dragged = fixture.Page.Locator(".sortable-chosen, .sortable-drag, [data-sortable-item].sortable-ghost").First;
+        if (await dragged.CountAsync() == 0)
+        {
+            return false;
+        }
+
+        return await DescribePositionAsync(dragged) != originalSignature;
+    }
+
+    /// <summary>
+    /// Chooses the point to drop on, in viewport coordinates.
+    /// </summary>
+    /// <remarks>
+    /// A row in a tree encloses its own child list, so its box spans the whole subtree and its
+    /// midpoint lands inside the nested list rather than in the list the row belongs to. Aiming at
+    /// the row's own label keeps the pointer in the parent list, and above the row's midpoint,
+    /// which is what makes SortableJS insert before it.
+    /// </remarks>
+    private static async Task<(float X, float Y)> ResolveDropPointAsync(
+        ILocator target,
+        ILocator targetLocator,
+        bool afterTarget,
+        LocatorBoundingBoxResult rowBox)
+    {
+        var hasNestedList = await target.Locator("[data-sortable-item]").CountAsync() > 0;
+        var box = hasNestedList ? await targetLocator.BoundingBoxAsync() ?? rowBox : rowBox;
+        return (box.X + box.Width / 2, box.Y + box.Height * (afterTarget ? 0.9f : 0.5f));
+    }
+
+    [Fact]
+    public async Task SpillRevertPutsTheItemBackWhenDroppedOutsideEveryList()
+    {
+        var frame = await fixture.NavigateToStoryAsync(SpillStory);
+        var before = await ReadModelAsync(frame);
+        var identity = before.Item("reverting", "comes-back").Identity;
+
+        await DragOutsideAsync(frame.GetByTestId("item-comes-back"));
+
+        await AssertInvariantAsync(
+            frame,
+            Expected("reverting", "revert-list", "comes-back", "stays-put"),
+            Expected("removing", "remove-list", "gets-removed", "stays-here"));
+        var after = await ReadModelAsync(frame);
+        Assert.Equal(identity, after.Item("reverting", "comes-back").Identity);
+    }
+
+    [Fact]
+    public async Task SpillRemoveDropsTheItemFromTheModelWhenDroppedOutsideEveryList()
+    {
+        var frame = await fixture.NavigateToStoryAsync(SpillStory);
+
+        await DragOutsideAsync(frame.GetByTestId("item-gets-removed"));
+
+        await AssertInvariantAsync(
+            frame,
+            Expected("reverting", "revert-list", "comes-back", "stays-put"),
+            Expected("removing", "remove-list", "stays-here"));
+    }
+
+    [Fact]
+    public async Task AutoScrollScrollsTheContainerWhileDraggingTowardsItsEdge()
+    {
+        var frame = await fixture.NavigateToStoryAsync(AutoScrollStory);
+        var container = frame.GetByTestId("scroll-container");
+        var scrollTopBefore = await container.EvaluateAsync<int>("element => element.scrollTop");
+        Assert.Equal(0, scrollTopBefore);
+
+        var source = await ResolveDraggableAsync(frame.GetByTestId("item-row-1"));
+        var sourceBox = await source.BoundingBoxAsync();
+        var containerBox = await container.BoundingBoxAsync();
+        Assert.NotNull(sourceBox);
+        Assert.NotNull(containerBox);
+
+        await fixture.Page.Mouse.MoveAsync(sourceBox.X + sourceBox.Width / 2, sourceBox.Y + sourceBox.Height / 2);
+        await fixture.Page.Mouse.DownAsync();
+        await fixture.Page.WaitForTimeoutAsync(50);
+
+        // Hold just inside the bottom edge, within ScrollSensitivity, and let the scroll loop run.
+        var edgeX = containerBox.X + containerBox.Width / 2;
+        var edgeY = containerBox.Y + containerBox.Height - 8;
+        for (var step = 1; step <= 30; step++)
+        {
+            await fixture.Page.Mouse.MoveAsync(edgeX, edgeY - step % 2);
+            await fixture.Page.WaitForTimeoutAsync(50);
+        }
+
+        var scrollTopDuringDrag = await container.EvaluateAsync<int>("element => element.scrollTop");
+        await fixture.Page.Mouse.UpAsync();
+        await fixture.Page.WaitForTimeoutAsync(300);
+
+        Assert.True(
+            scrollTopDuringDrag > 0,
+            $"The container should have auto-scrolled while dragging at its edge, but scrollTop stayed at {scrollTopDuringDrag}.");
+    }
+
+    /// <summary>
+    /// Drags an item well clear of every list so SortableJS treats the release as a spill.
+    /// </summary>
+    private async Task DragOutsideAsync(ILocator sourceLocator)
+    {
+        var source = await ResolveDraggableAsync(sourceLocator);
+        var sourceBox = await source.BoundingBoxAsync();
+        Assert.NotNull(sourceBox);
+
+        var viewport = fixture.Page.ViewportSize!;
+        var startX = sourceBox.X + sourceBox.Width / 2;
+        var startY = sourceBox.Y + sourceBox.Height / 2;
+        var endX = viewport.Width - 40;
+        var endY = viewport.Height - 40;
+
+        await fixture.Page.Mouse.MoveAsync(startX, startY);
+        await fixture.Page.Mouse.DownAsync();
+        await fixture.Page.WaitForTimeoutAsync(50);
+        for (var step = 1; step <= 16; step++)
+        {
+            var progress = (float)step / 16;
+            await fixture.Page.Mouse.MoveAsync(startX + (endX - startX) * progress, startY + (endY - startY) * progress);
+            await fixture.Page.WaitForTimeoutAsync(30);
+        }
+
+        await fixture.Page.WaitForTimeoutAsync(150);
+        await fixture.Page.Mouse.UpAsync();
+        await fixture.Page.WaitForTimeoutAsync(150);
+    }
+
     private static ExpectedCollection Expected(string modelName, string listTestId, params string[] keys) =>
         new(modelName, listTestId, keys);
 
@@ -164,8 +303,12 @@ public sealed class SortableDragTests(DemoFixture fixture)
         // destination after the drag has started rather than before.
         var targetBox = await target.BoundingBoxAsync();
         Assert.NotNull(targetBox);
-        var endX = targetBox.X + targetBox.Width / 2;
-        var endY = targetBox.Y + targetBox.Height * (afterTarget ? 0.9f : 0.5f);
+
+        // A row in a tree encloses its own child list, so its box spans the whole subtree and its
+        // midpoint lands inside the nested list rather than in the list the row belongs to.
+        // Aiming at the row's own label keeps the pointer in the parent list, and above the row's
+        // midpoint, which is what makes SortableJS insert before it.
+        var (endX, endY) = await ResolveDropPointAsync(target, targetLocator, afterTarget, targetBox);
 
         // Step along the path in increments no larger than half a row. SortableJS's fallback path
         // decides a swap when the pointer crosses a *sibling's* midpoint, so a few small jitters
@@ -175,6 +318,18 @@ public sealed class SortableDragTests(DemoFixture fixture)
         var steps = Math.Max(8, (int)Math.Ceiling(distance / stride));
         for (var step = 1; step <= steps; step++)
         {
+            // The destination shifts while the drag is in flight: rows are removed from the source
+            // list and inserted into whichever list the pointer is over, so a drop point computed
+            // at mouse-down is stale by the time the pointer arrives. Re-steer as we go.
+            if (step % 3 == 0)
+            {
+                var currentBox = await target.BoundingBoxAsync();
+                if (currentBox is not null)
+                {
+                    (endX, endY) = await ResolveDropPointAsync(target, targetLocator, afterTarget, currentBox);
+                }
+            }
+
             var progress = (float)step / steps;
             await fixture.Page.Mouse.MoveAsync(
                 startX + (endX - startX) * progress,
@@ -182,13 +337,28 @@ public sealed class SortableDragTests(DemoFixture fixture)
             await fixture.Page.WaitForTimeoutAsync(30);
         }
 
+        // Settle on the final position so the last dragover lands where we intend.
+        var finalBox = await target.BoundingBoxAsync();
+        if (finalBox is not null)
+        {
+            var (finalX, finalY) = await ResolveDropPointAsync(target, targetLocator, afterTarget, finalBox);
+            await fixture.Page.Mouse.MoveAsync(finalX, finalY);
+            await fixture.Page.WaitForTimeoutAsync(60);
+            await fixture.Page.Mouse.MoveAsync(finalX, finalY + 1);
+            await fixture.Page.WaitForTimeoutAsync(60);
+        }
+
         await fixture.Page.WaitForTimeoutAsync(150);
         await fixture.Page.Mouse.UpAsync();
         await fixture.Page.WaitForTimeoutAsync(150);
     }
 
-    private static async Task AssertInvariantAsync(ILocator frame, params ExpectedCollection[] expected)
+    private async Task AssertInvariantAsync(ILocator frame, params ExpectedCollection[] expected)
     {
+        // A drag can leave the model perfectly correct while Blazor throws rendering the result,
+        // so every scenario checks the console as well as the data.
+        fixture.AssertNoJsErrors();
+
         var state = await WaitForExpectedModelAsync(frame, expected, TimeSpan.FromSeconds(10));
         Assert.Equal(expected.Select(item => item.ModelName).Order(), state.Collections.Keys.Order());
 
