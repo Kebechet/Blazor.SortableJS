@@ -2,7 +2,11 @@
 
 <Stories TComponent="SortableStoryArgs">
     <Story Name="Reorder in place">
+        <Description>
+            The simplest case: one list, drag to reorder. The panel underneath prints the bound <code>List&lt;DemoItem&gt;</code> after every drop, including each item's CLR identity, so you can see that reordering moves the existing instances rather than recreating them.
+        </Description>
         <Template Context="context">
+            <p class="demo-hint">Drag a row to reorder. Watch the panel below: the order changes but every <code>identity</code> stays equal to its <code>initialIdentity</code>, because the bound list is reordered in place.</p>
             <Sortable TItem="DemoItem"
                       Items="_items"
                       Options="@StorySupport.WithFallback(_options, context.Args)"

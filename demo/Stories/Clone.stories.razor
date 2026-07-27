@@ -1,8 +1,12 @@
-@attribute [Stories("SortableJS/Features")]
+@attribute [Stories("SortableJS/Clone")]
 
 <Stories TComponent="SortableStoryArgs">
     <Story Name="Clone mode">
+        <Description>
+            Clone mode. The palette keeps its items; dropping onto the canvas creates a distinct new instance rather than moving the original.
+        </Description>
         <Template Context="context">
+            <p class="demo-hint">Drag from <strong>Palette</strong> to <strong>Canvas</strong>. The palette item stays where it is and the canvas receives a separate copy - note the differing identity values in the panel below.</p>
             <div class="demo-board">
                 <div>
                     <h3>Palette</h3>

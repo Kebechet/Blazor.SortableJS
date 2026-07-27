@@ -1,19 +1,38 @@
-@attribute [Stories("SortableJS/Features")]
+@attribute [Stories("SortableJS/Auto-scroll")]
 
-<Stories TComponent="Sortable<string>">
+<Stories TComponent="SortableStoryArgs">
     <Story Name="Auto-scroll">
-        <Template>
-            <div class="demo-scroll-container">
-                <Sortable TItem="string" Items="_items" Options="_options" RootClass="demo-list" ItemClass="demo-item">
-                    <ItemTemplate Context="item">@item</ItemTemplate>
+        <Description>
+            The list is taller than its container, which is capped at 280px with <code>overflow-y: auto</code>. Drag an item towards the top or bottom edge of that box and the container scrolls on its own, so you can drop the item outside the part you can currently see.
+        </Description>
+        <Template Context="context">
+            <p class="demo-hint">Drag an item to the top or bottom edge of the box: the container scrolls automatically so you can drop beyond the visible rows. <code>ScrollSensitivity</code> is how close to the edge you must get (50px), <code>ScrollSpeed</code> how fast it scrolls (14px per frame).</p>
+            <div class="demo-scroll-container" data-testid="scroll-container">
+                <Sortable TItem="DemoItem"
+                          Items="_items"
+                          Options="@StorySupport.WithFallback(_options, context.Args)"
+                          ItemKeySelector="@(item => item.Key)"
+                          OnEnd="ModelChanged"
+                          RootClass="demo-list"
+                          ItemClass="demo-item"
+                          data-testid="scroll-list"
+                          data-fallback-forced="@StorySupport.FallbackAttributeValue(context.Args)">
+                    <ItemTemplate Context="item">
+                        <span class="demo-item-content" data-item-key="@item.Key" data-testid="item-@item.Key">@item.Label</span>
+                    </ItemTemplate>
                 </Sortable>
             </div>
+            <ModelState Json="@ModelJson" />
         </Template>
     </Story>
 </Stories>
 
 @code {
-    private readonly List<string> _items = Enumerable.Range(1, 20).Select(number => $"Scrollable item {number}").ToList();
+    private readonly List<DemoItem> _items = Enumerable
+        .Range(1, 20)
+        .Select(number => new DemoItem($"row-{number}", $"Scrollable item {number}"))
+        .ToList();
+
     private readonly SortableOptions _options = new()
     {
         AnimationDuration = 100,
@@ -22,4 +41,8 @@
         ScrollSpeed = 14,
         ShouldBubbleScroll = true
     };
+
+    private string ModelJson => StorySupport.SerializeState(new DemoCollection("items", _items));
+
+    private void ModelChanged() => StateHasChanged();
 }

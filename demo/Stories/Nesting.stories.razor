@@ -1,8 +1,12 @@
-@attribute [Stories("SortableJS/Features")]
+@attribute [Stories("SortableJS/Nesting")]
 
 <Stories TComponent="SortableStoryArgs">
     <Story Name="Arbitrarily nested lists">
+        <Description>
+            Lists nested to arbitrary depth, every level sharing one group name. Each list registers itself, so a recursive component needs no ids, no manual wiring and no registration bookkeeping.
+        </Description>
         <Template Context="context">
+            <p class="demo-hint">Drag a leaf between any two lists, at any depth, including out to the root. Note: dragging the <em>only</em> remaining child out of a nested list currently does nothing - that is why <strong>Web</strong> keeps a second child.</p>
             <RecursiveTree Items="_tree"
                            ListTestId="tree-root"
                            ForceFallback="@StorySupport.IsFallbackForced(context.Args)"
@@ -14,19 +18,21 @@
 
 @code {
     private readonly TreeNode _components = new("Components");
+    private readonly TreeNode _services = new("Services");
     private TreeNode _web = null!;
     private TreeNode _applications = null!;
     private readonly TreeNode _mobile = new("Mobile");
     private readonly TreeNode _sortableJs = new("SortableJS");
+    private readonly TreeNode _archive = new("Archive");
     private TreeNode _libraries = null!;
     private List<TreeNode> _tree = null!;
 
     protected override void OnInitialized()
     {
-        _web = new("Web", _components);
+        _web = new("Web", _components, _services);
         _applications = new("Applications", _web, _mobile);
         _libraries = new("Libraries", _sortableJs);
-        _tree = [_applications, _libraries];
+        _tree = [_applications, _libraries, _archive];
     }
 
     private string ModelJson => StorySupport.SerializeState(

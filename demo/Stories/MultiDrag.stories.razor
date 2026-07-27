@@ -1,9 +1,12 @@
-@attribute [Stories("SortableJS/Features")]
+@attribute [Stories("SortableJS/MultiDrag")]
 
 <Stories TComponent="SortableStoryArgs">
     <Story Name="MultiDrag">
+        <Description>
+            The MultiDrag plugin. Several items can be selected and dragged as one group, and their relative order is preserved at the destination.
+        </Description>
         <Template Context="context">
-            <p>Hold Control (Command on macOS when configured with Meta) to select several items, then drag the selection.</p>
+            <p class="demo-hint">Hold <strong>Ctrl</strong> (or Cmd, when configured with Meta) to select several items, then drag the selection. All selected rows move together and keep their relative order.</p>
             <Sortable TItem="DemoItem"
                       Items="_items"
                       Options="@StorySupport.WithFallback(_options, context.Args)"

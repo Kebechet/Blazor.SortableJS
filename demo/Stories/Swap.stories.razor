@@ -1,8 +1,12 @@
-@attribute [Stories("SortableJS/Features")]
+@attribute [Stories("SortableJS/Swap")]
 
 <Stories TComponent="SortableStoryArgs">
     <Story Name="Swap plugin">
+        <Description>
+            The Swap plugin. Instead of shifting the rest of the list to make room, dropping onto an item exchanges the two positions.
+        </Description>
         <Template Context="context">
+            <p class="demo-hint">Drag one tile onto another: the two swap places and nothing else moves. The hovered target is highlighted via <code>SwapClass</code>.</p>
             <Sortable TItem="DemoItem"
                       Items="_items"
                       Options="@StorySupport.WithFallback(_options, context.Args)"

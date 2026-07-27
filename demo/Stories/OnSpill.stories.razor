@@ -1,29 +1,81 @@
-@attribute [Stories("SortableJS/Features")]
+@attribute [Stories("SortableJS/OnSpill")]
 
-<Stories TComponent="Sortable<string>">
+<Stories TComponent="SortableStoryArgs">
     <Story Name="OnSpill policies">
-        <Template>
+        <Description>
+            The OnSpill plugin, in both of its modes. Spilling means releasing the drag outside any list.
+        </Description>
+        <Template Context="context">
+            <p class="demo-hint">Drag each item well outside every list and release. The left one reverts to its place (<code>ShouldRevertOnSpill</code>); the right one is removed from the collection (<code>ShouldRemoveOnSpill</code>).</p>
             <div class="demo-board">
                 <div>
-                    <p>Drop outside: revert</p>
-                    <Sortable TItem="string" Items="_reverting" Options="_revertOptions" RootClass="demo-list" ItemClass="demo-item">
-                        <ItemTemplate Context="item">@item</ItemTemplate>
+                    <h3>Drop outside: revert</h3>
+                    <Sortable TItem="DemoItem"
+                              Items="_reverting"
+                              Options="@StorySupport.WithFallback(_revertOptions, context.Args)"
+                              ItemKeySelector="@(item => item.Key)"
+                              OnEnd="ModelChanged"
+                              RootClass="demo-list"
+                              ItemClass="demo-item"
+                              data-testid="revert-list"
+                              data-fallback-forced="@StorySupport.FallbackAttributeValue(context.Args)">
+                        <ItemTemplate Context="item">
+                            <span class="demo-item-content" data-item-key="@item.Key" data-testid="item-@item.Key">@item.Label</span>
+                        </ItemTemplate>
                     </Sortable>
                 </div>
                 <div>
-                    <p>Drop outside: remove</p>
-                    <Sortable TItem="string" Items="_removing" Options="_removeOptions" RootClass="demo-list" ItemClass="demo-item">
-                        <ItemTemplate Context="item">@item</ItemTemplate>
+                    <h3>Drop outside: remove</h3>
+                    <Sortable TItem="DemoItem"
+                              Items="_removing"
+                              Options="@StorySupport.WithFallback(_removeOptions, context.Args)"
+                              ItemKeySelector="@(item => item.Key)"
+                              OnEnd="ModelChanged"
+                              RootClass="demo-list"
+                              ItemClass="demo-item"
+                              data-testid="remove-list"
+                              data-fallback-forced="@StorySupport.FallbackAttributeValue(context.Args)">
+                        <ItemTemplate Context="item">
+                            <span class="demo-item-content" data-item-key="@item.Key" data-testid="item-@item.Key">@item.Label</span>
+                        </ItemTemplate>
                     </Sortable>
                 </div>
             </div>
+            <ModelState Json="@ModelJson" />
         </Template>
     </Story>
 </Stories>
 
 @code {
-    private readonly List<string> _reverting = new() { "I come back" };
-    private readonly List<string> _removing = new() { "I am removed" };
-    private readonly SortableOptions _revertOptions = new() { ShouldRevertOnSpill = true };
-    private readonly SortableOptions _removeOptions = new() { ShouldRemoveOnSpill = true };
+    private readonly List<DemoItem> _reverting =
+    [
+        new("comes-back", "I come back"),
+        new("stays-put", "I stay put")
+    ];
+
+    private readonly List<DemoItem> _removing =
+    [
+        new("gets-removed", "I am removed"),
+        new("stays-here", "I stay here")
+    ];
+
+    private readonly SortableOptions _revertOptions = new()
+    {
+        AnimationDuration = 150,
+        Group = new SortableGroupOptions { Name = "spill-revert" },
+        ShouldRevertOnSpill = true
+    };
+
+    private readonly SortableOptions _removeOptions = new()
+    {
+        AnimationDuration = 150,
+        Group = new SortableGroupOptions { Name = "spill-remove" },
+        ShouldRemoveOnSpill = true
+    };
+
+    private string ModelJson => StorySupport.SerializeState(
+        new DemoCollection("reverting", _reverting),
+        new DemoCollection("removing", _removing));
+
+    private void ModelChanged() => StateHasChanged();
 }

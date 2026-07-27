@@ -47,6 +47,12 @@ internal static class StorySupport
         return IsFallbackForced(args) ? "true" : "false";
     }
 
+    /// <inheritdoc cref="FallbackAttributeValue(IReadOnlyDictionary{string, object?})"/>
+    public static string FallbackAttributeValue(bool isFallbackForced)
+    {
+        return isFallbackForced ? "true" : "false";
+    }
+
     public static string SerializeState(params DemoCollection[] collections)
     {
         return JsonSerializer.Serialize(new

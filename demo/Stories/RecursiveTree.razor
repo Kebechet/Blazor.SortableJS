@@ -1,40 +1,37 @@
-@if (Items.Count > 0)
-{
-    <Sortable TItem="TreeNode"
-              Items="Items"
-              Options="@StorySupport.WithFallback(_treeOptions, ForceFallback)"
-              ItemKeySelector="@(node => node.Key)"
-              OnEnd="ModelChanged"
-              RootClass="demo-list demo-tree"
-              ItemClass="demo-item"
-              data-testid="@ListTestId"
-              data-fallback-forced="@ForceFallback">
-        <ItemTemplate Context="node">
-            <span class="demo-item-content" data-item-key="@node.Key" data-testid="item-@node.Key">@node.Label</span>
-            <RecursiveTree Items="node.Children"
-                           ListTestId="@($"tree-children-{node.Key}")"
-                           ForceFallback="ForceFallback"
-                           ModelChanged="ModelChanged" />
-        </ItemTemplate>
-    </Sortable>
-}
+<Sortable TItem="TreeNode"
+          Items="Items"
+          Options="@StorySupport.WithFallback(_treeOptions, ForceFallback)"
+          ItemKeySelector="@(node => node.Key)"
+          OnEnd="ModelChanged"
+          RootClass="demo-list demo-tree"
+          ItemClass="demo-item"
+          data-testid="@ListTestId"
+          data-fallback-forced="@StorySupport.FallbackAttributeValue(ForceFallback)">
+    <ItemTemplate Context="node">
+        <span class="demo-item-content" data-item-key="@node.Key" data-testid="item-@node.Key">@node.Label</span>
+        <RecursiveTree Items="node.Children"
+                       ListTestId="@($"tree-children-{node.Key}")"
+                       ForceFallback="ForceFallback"
+                       ModelChanged="ModelChanged" />
+    </ItemTemplate>
+</Sortable>
 
 @code {
     [Parameter, EditorRequired]
-    public IList<TreeNode> Items { get; set; } = new List<TreeNode>();
+public IList<TreeNode> Items { get; set; } = new List<TreeNode>();
 
     [Parameter, EditorRequired]
-    public string ListTestId { get; set; } = string.Empty;
+public string ListTestId { get; set; } = string.Empty;
 
     [Parameter]
-    public bool ForceFallback { get; set; }
+public bool ForceFallback { get; set; }
 
     [Parameter]
-    public EventCallback ModelChanged { get; set; }
+public EventCallback ModelChanged { get; set; }
 
-    private readonly SortableOptions _treeOptions = new()
-    {
-        AnimationDuration = 150,
-        Group = new SortableGroupOptions { Name = "tree" }
-    };
+private readonly SortableOptions _treeOptions = new()
+{
+    AnimationDuration = 150,
+    Group = new SortableGroupOptions { Name = "tree" }
+};
 }

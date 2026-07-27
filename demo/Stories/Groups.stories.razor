@@ -1,8 +1,12 @@
-@attribute [Stories("SortableJS/Features")]
+@attribute [Stories("SortableJS/Groups")]
 
 <Stories TComponent="SortableStoryArgs">
     <Story Name="Connected groups with pull and put policies">
+        <Description>
+            Two lists sharing one group name, with different pull/put policies. Backlog allows items to be taken out but refuses anything dropped in, so a drag in that direction is rejected and both collections stay unchanged.
+        </Description>
         <Template Context="context">
+            <p class="demo-hint">Drag from <strong>Backlog</strong> to <strong>Done</strong>: the item moves, keeping the same identity. Drag the other way and nothing happens - Backlog has <code>put</code> disabled, so the drop is refused.</p>
             <div class="demo-board">
                 <div>
                     <h3>Backlog (put disabled)</h3>
