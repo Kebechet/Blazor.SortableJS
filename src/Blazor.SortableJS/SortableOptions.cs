@@ -184,10 +184,25 @@ public sealed class SortableStoreOptions
     public string Key { get; set; } = string.Empty;
 }
 
-/// <summary>Provides app-wide defaults merged underneath each component's options.</summary>
+/// <summary>Provides process-wide defaults merged underneath each component's options.</summary>
+/// <remarks>
+/// Safe to set once at startup, and only then. On Blazor Server this value is shared by every
+/// circuit, so assigning it in response to a user - a per-user preference, a tenant theme, a runtime
+/// toggle - changes behaviour for everyone currently connected, and a host running several apps in
+/// one process has no way to keep them apart. Register
+/// <see cref="SortableServiceCollectionExtensions.AddSortableJs"/> instead and the defaults are
+/// scoped like any other service. A registered <see cref="ISortableDefaults"/> takes precedence.
+/// </remarks>
 public static class SortableDefaults
 {
     /// <summary>Gets or sets the default options used by subsequently initialized components.</summary>
     public static SortableOptions? Options { get; set; }
+}
+
+/// <summary>Supplies the default options merged underneath each component's own options.</summary>
+public interface ISortableDefaults
+{
+    /// <summary>Gets the defaults, or null to apply none.</summary>
+    SortableOptions? Options { get; }
 }
 

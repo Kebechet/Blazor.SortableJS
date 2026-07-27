@@ -75,9 +75,37 @@ Connected and nested lists only need the same group name. Each component registe
 }
 ```
 
-Use `CloneFunction` to create a distinct object for clone mode, or `ConvertFunction` on a destination whose item type differs from the source. `ShouldUseItemKeys` is enabled by default; set `ItemKeySelector` when the item itself is not the desired stable key. `SortableDefaults.Options` supplies app-wide defaults.
+Use `CloneFunction` to create a distinct object for clone mode, or `TryConvertFunction` on a destination whose item type differs from the source - returning `false` refuses the item and leaves both collections untouched, so a rejection does not have to be an exception. `ShouldUseItemKeys` is enabled by default; set `ItemKeySelector` when the item itself is not the desired stable key.
+
+`Items` may be null, which makes the list accept-only: it takes drops and raises the usual callbacks but stores nothing, and items still leave their source collection. That is a delete or archive zone without a throwaway list behind it. `IsItemDraggable` marks individual rows undraggable without hand-rolling a marker class and filter selector.
+
+### Defaults
+
+Register them so they are scoped like any other service:
+
+```csharp
+builder.Services.AddSortableJs(options => options.AnimationDuration = 150);
+```
+
+`SortableDefaults.Options` still works and is fine to assign once at startup. Avoid it on Blazor Server for anything user-specific: the static is shared by every circuit, so a per-user or per-tenant default would change behaviour for everyone connected. A registered `ISortableDefaults` takes precedence.
+
+### Callbacks observe; decisions decide
 
 All fifteen callbacks use `SortableEventArgs<TItem>`. `OnAdd` runs before collection mutation, while the moved reference is still in the source; `OnRemove` follows. `OldIndexes` and `NewIndexes` contain every affected index for MultiDrag, not only the primary item.
+
+They are **observational**. SortableJS reads the return value of `onMove`, `group.pull` and `group.put` synchronously, and an `EventCallback` is asynchronous, so `OnMove` cannot veto a drop or steer placement. Three separate parameters do that:
+
+```csharp
+<Sortable Items="_items"
+          MoveDecision="context => context.RelatedItem?.IsPinned == true
+              ? SortableMoveDecision.Reject
+              : SortableMoveDecision.Default"
+          CanAcceptItem="context => context.Item?.IsArchived == false" />
+```
+
+`MoveDecision` can reject a move or force insertion before or after the item under the pointer; `CanAcceptItem` and `CanReleaseItem` are the per-item `put` and `pull` predicates the fixed group modes cannot express.
+
+These need synchronous interop and so are **WebAssembly only**. Setting one under Blazor Server throws `PlatformNotSupportedException` rather than silently never taking effect.
 
 ## Coverage vs. SortableJS 1.15.7
 
@@ -92,9 +120,11 @@ The counts come from the actual vendored 1.15.7 source: 33 core options, 6 AutoS
 
 - In-place same-list, cross-list, and multi-item moves with reference identity preserved
 - Automatic depth-independent registration for recursive lists
-- Pull/put group policies, clone mode, and cross-type conversion
+- Pull/put group policies, clone mode, and cross-type conversion that can decline an item
+- Synchronous move, put and pull decisions on WebAssembly - veto a drop or override its position
+- Accept-only drop zones, and per-item draggability
 - MultiDrag, Swap, AutoScroll, RevertOnSpill, and RemoveOnSpill
-- Stable keyed rendering and app-wide defaults
+- Stable keyed rendering, and defaults through DI or a static
 - DOM rollback before Blazor mutation, full event coverage, and deterministic disposal
 - `net6.0` through `net10.0`
 

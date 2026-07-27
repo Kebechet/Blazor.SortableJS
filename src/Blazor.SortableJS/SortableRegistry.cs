@@ -78,7 +78,21 @@ internal sealed class SortableRegistry
         IReadOnlyList<object?> destinationItems = Array.Empty<object?>();
         if (!sortableEvent.IsSpillRemoval && !sortableEvent.IsSwap)
         {
-            destinationItems = sourceItems.Select(item => destination.ConvertIncoming(item, sortableEvent.IsClone)).ToArray();
+            var converted = new List<object?>(sourceItems.Count);
+            foreach (var sourceItem in sourceItems)
+            {
+                // A refusal aborts the whole operation rather than transferring part of it: the
+                // items moved together, so landing some of them and dropping the rest would be a
+                // silent partial move. Both collections stay exactly as they were.
+                if (!destination.TryConvertIncoming(sourceItem, sortableEvent.IsClone, out var convertedItem))
+                {
+                    return null;
+                }
+
+                converted.Add(convertedItem);
+            }
+
+            destinationItems = converted;
         }
 
         return new SortableOperationPlan(sortableEvent, source, destination, oldIndexes, sourceItems, destinationItems);
@@ -117,6 +131,8 @@ internal sealed class SortableRegistry
         destination.LastMovedItems = plan.DestinationItems;
         if (!sortableEvent.IsClone)
         {
+            // An accept-only destination still takes the items off the source - that is what makes
+            // it a delete or archive zone rather than a list that silently duplicates them.
             foreach (var index in plan.OldIndexes.OrderByDescending(index => index))
             {
                 source.RemoveAt(index);
@@ -138,9 +154,12 @@ internal sealed class SortableRegistry
             .OrderBy(insertion => insertion.Index)
             .ToArray();
 
-        foreach (var insertion in insertions)
+        if (!destination.IsAcceptOnly)
         {
-            destination.Insert(Math.Min(insertion.Index, destination.Count), insertion.Item);
+            foreach (var insertion in insertions)
+            {
+                destination.Insert(Math.Min(insertion.Index, destination.Count), insertion.Item);
+            }
         }
 
         source.RequestRender();
@@ -186,9 +205,14 @@ internal interface ISortableContainer
 {
     string Id { get; }
     int Count { get; }
+
+    /// <summary>True when the list takes drops but stores nothing, such as a delete zone.</summary>
+    bool IsAcceptOnly { get; }
     IReadOnlyList<object?> LastMovedItems { get; set; }
     IReadOnlyList<object?> ReadItems(IReadOnlyList<int> indexes);
-    object? ConvertIncoming(object? item, bool isClone);
+
+    /// <summary>Converts an incoming item, returning false when this list declines to accept it.</summary>
+    bool TryConvertIncoming(object? item, bool isClone, out object? converted);
     void RemoveAt(int index);
     void Insert(int index, object? item);
     void Swap(int firstIndex, int secondIndex);
