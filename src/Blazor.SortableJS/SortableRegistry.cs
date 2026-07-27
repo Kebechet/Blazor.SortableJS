@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using Microsoft.JSInterop;
 
@@ -122,13 +123,18 @@ internal sealed class SortableRegistry
             }
         }
 
+        // The removal above is unconditional, so every item must be placed somewhere. SortableJS
+        // reports a destination index of -1 in some drops; discarding those insertions removed the
+        // item from its source and put it nowhere, losing it silently. Fall back to appending.
+        // See SortableItemLossTests.
         var insertions = plan.DestinationItems
             .Select((item, position) => new
             {
                 Item = item,
-                Index = position < sortableEvent.NewIndexes.Length ? sortableEvent.NewIndexes[position] : destination.Count
+                Index = position < sortableEvent.NewIndexes.Length && sortableEvent.NewIndexes[position] >= 0
+                    ? sortableEvent.NewIndexes[position]
+                    : destination.Count
             })
-            .Where(insertion => insertion.Index >= 0)
             .OrderBy(insertion => insertion.Index)
             .ToArray();
 
@@ -187,4 +193,23 @@ internal interface ISortableContainer
     void Insert(int index, object? item);
     void Swap(int firstIndex, int secondIndex);
     void RequestRender();
+}
+
+/// <summary>
+/// Hands out the auto-generated DOM ids for <see cref="Sortable{TItem}"/>.
+/// </summary>
+/// <remarks>
+/// Deliberately non-generic. A static counter declared inside <c>Sortable&lt;TItem&gt;</c> gets its
+/// own storage per closed generic type, so <c>Sortable&lt;Foo&gt;</c> and <c>Sortable&lt;Bar&gt;</c>
+/// would both start at 1 and collide in the shared registry. See
+/// <c>SortableRegistryTests.Generated_ids_are_unique_across_item_types</c>.
+/// </remarks>
+internal static class SortableElementId
+{
+    private static long _next;
+
+    internal static string Next()
+    {
+        return $"kebechet-sortable-{Interlocked.Increment(ref _next).ToString(CultureInfo.InvariantCulture)}";
+    }
 }

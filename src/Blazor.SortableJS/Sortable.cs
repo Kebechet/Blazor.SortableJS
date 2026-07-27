@@ -15,7 +15,6 @@ public sealed class Sortable<TItem> : ComponentBase, IAsyncDisposable, ISortable
     private const string ItemMarkerAttribute = "data-sortable-item";
     private const string DefaultDataIdAttribute = "data-id";
     private const string SetDataTextAttribute = "data-sortable-text";
-    private static long _nextId;
     private readonly List<object?> _lastMovedItems = new();
     private DotNetObjectReference<Sortable<TItem>>? _dotNetReference;
     private IJSObjectReference? _module;
@@ -150,7 +149,7 @@ public sealed class Sortable<TItem> : ComponentBase, IAsyncDisposable, ISortable
     protected override void OnInitialized()
     {
         _resolvedId = string.IsNullOrWhiteSpace(Id)
-            ? $"kebechet-sortable-{Interlocked.Increment(ref _nextId).ToString(CultureInfo.InvariantCulture)}"
+            ? SortableElementId.Next()
             : Id;
         _registry = SortableRegistryProvider.Get(JSRuntime);
         _registry.Register(this);
@@ -221,40 +220,40 @@ public sealed class Sortable<TItem> : ComponentBase, IAsyncDisposable, ISortable
             throw new InvalidOperationException("RootTag and ItemTag cannot be empty.");
         }
 
-        var sequence = 0;
-        builder.OpenElement(sequence++, RootTag);
-        builder.AddMultipleAttributes(sequence++, AdditionalAttributes);
-        builder.AddAttribute(sequence++, "id", _resolvedId);
+        // Render-tree sequences identify source locations, so every loop iteration must reuse them.
+        builder.OpenElement(0, RootTag);
+        builder.AddMultipleAttributes(1, AdditionalAttributes);
+        builder.AddAttribute(2, "id", _resolvedId);
         if (!string.IsNullOrWhiteSpace(RootClass))
         {
-            builder.AddAttribute(sequence++, "class", RootClass);
+            builder.AddAttribute(3, "class", RootClass);
         }
 
         for (var index = 0; index < Items.Count; index++)
         {
             var item = Items[index];
-            builder.OpenElement(sequence++, ItemTag);
+            builder.OpenElement(4, ItemTag);
             builder.SetKey(GetRenderKey(item, index));
-            builder.AddAttribute(sequence++, ItemMarkerAttribute, string.Empty);
+            builder.AddAttribute(5, ItemMarkerAttribute, string.Empty);
             if (!string.IsNullOrWhiteSpace(ItemClass))
             {
-                builder.AddAttribute(sequence++, "class", ItemClass);
+                builder.AddAttribute(6, "class", ItemClass);
             }
 
             var key = GetStableItemKey(item);
             if (key is not null)
             {
-                builder.AddAttribute(sequence++, Options.DataIdAttribute ?? DefaultDataIdAttribute, Convert.ToString(key, CultureInfo.InvariantCulture));
+                builder.AddAttribute(7, Options.DataIdAttribute ?? DefaultDataIdAttribute, Convert.ToString(key, CultureInfo.InvariantCulture));
             }
 
             if (SetDataTextSelector is not null)
             {
-                builder.AddAttribute(sequence++, SetDataTextAttribute, SetDataTextSelector(item));
+                builder.AddAttribute(8, SetDataTextAttribute, SetDataTextSelector(item));
             }
 
             if (ItemTemplate is not null)
             {
-                builder.AddContent(sequence++, ItemTemplate(item));
+                builder.AddContent(9, ItemTemplate(item));
             }
 
             builder.CloseElement();
