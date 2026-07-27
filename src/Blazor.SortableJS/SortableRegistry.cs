@@ -87,6 +87,13 @@ internal sealed class SortableRegistry
 
         var sourceItems = source.ReadItems(oldIndexes);
 
+        // Recorded before anything can refuse the move, not in Apply. SortableJS emits "add" and
+        // then "remove", and the remove callback reads this to report what left. A refusal returns
+        // before Apply, so the field kept whatever the previous successful drag put there and the
+        // remove reported that drag's items as though they had just moved. See
+        // SortableTransferPolicyTests.
+        source.LastMovedItems = sourceItems;
+
         // Every moved item is checked, not just the one under the pointer. SortableJS calls the
         // group pull/put functions once, with the primary dragged element, so a MultiDrag selection
         // pairing an allowed row with a forbidden one was approved wholesale on the strength of the

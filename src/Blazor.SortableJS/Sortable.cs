@@ -284,7 +284,9 @@ public sealed class Sortable<TItem> : ComponentBase, IAsyncDisposable, ISortable
         // of the options is far cheaper than the call it avoids, and on Blazor Server that call
         // crosses the network.
         var description = DescribeOptions();
-        if (string.Equals(description, _lastAppliedOptions, StringComparison.Ordinal))
+        var hasScrollContainerSelector = !string.IsNullOrWhiteSpace(_resolvedDefaults?.ScrollContainerSelector) ||
+            !string.IsNullOrWhiteSpace(Options.ScrollContainerSelector);
+        if (!SortableUpdatePolicy.ShouldSendUpdate(_lastAppliedOptions, description, hasScrollContainerSelector))
         {
             return;
         }

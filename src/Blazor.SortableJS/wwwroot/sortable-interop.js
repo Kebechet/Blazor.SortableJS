@@ -3,7 +3,8 @@ import {
     setDataTextAttribute,
     undraggableClass,
     indexOfChild,
-    resolveQueueOwner
+    resolveQueueOwner,
+    canReleaseQueue
 } from "./sortable-policy.js";
 
 const sortableScriptMarker = "data-kebechet-sortablejs";
@@ -231,7 +232,7 @@ function buildOptions(state, defaultOptions, componentOptions) {
             // "end" also closes, but only after its own event has been enqueued, so it is handled
             // further down rather than here.
             if (queueAction === "close" && eventName === "unchoose") {
-                closeDragQueue();
+                closeDragQueue(dragToken);
                 dragSnapshots.clear();
             }
 
@@ -244,6 +245,7 @@ function buildOptions(state, defaultOptions, componentOptions) {
             // Deferring puts the restore after SortableJS is done.
             if (eventName === "spill") {
                 hasDeferredSpill = true;
+                const spillToken = dragToken;
                 setTimeout(() => {
                     restoreSnapshots();
                     enqueueEvent(state, payload);
@@ -260,9 +262,10 @@ function buildOptions(state, defaultOptions, componentOptions) {
                 // before the deferred spill and the mutation would be applied out of order.
                 // Queue behind it, then release the snapshots.
                 hasDeferredSpill = false;
+                const endToken = dragToken;
                 setTimeout(() => {
                     enqueueEvent(state, payload);
-                    closeDragQueue();
+                    closeDragQueue(endToken);
                     dragSnapshots.clear();
                 }, 0);
                 return;
@@ -270,7 +273,7 @@ function buildOptions(state, defaultOptions, componentOptions) {
 
             enqueueEvent(state, payload);
             if (eventName === "end") {
-                closeDragQueue();
+                closeDragQueue(dragToken);
                 dragSnapshots.clear();
             }
 
@@ -312,8 +315,11 @@ function readIndexes(multipleIndexes, singleIndex) {
 // Releasing the drag's queue only once its tail has settled keeps a trailing event ahead of
 // anything a later, unrelated event might enqueue. The token guards against a drag that starts
 // while the previous one is still draining, which would otherwise be released by the old drag.
-function closeDragQueue() {
-    const token = dragToken;
+function closeDragQueue(token) {
+    if (!canReleaseQueue(token, dragToken)) {
+        return;
+    }
+
     const tail = activeDragQueue;
     tail?.finally(() => {
         if (dragToken === token) {

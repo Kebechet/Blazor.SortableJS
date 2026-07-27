@@ -51,6 +51,18 @@ export function indexOfChild(container, child) {
  * Closing on "unchoose" is only safe before "start". During a real drag "unchoose" precedes
  * add/remove/sort, and releasing there would split a cross-list pair across two queues.
  */
+/**
+ * Decides whether work scheduled during one drag may still release the queue.
+ *
+ * The spill path defers its event and its release through a timer. That timer reads the queue state
+ * when it fires, not when it was scheduled, so if the next drag begins in between it would release
+ * a queue that drag is still using. Comparing the token captured at schedule time keeps a late
+ * timer from speaking for a drag that is not its own.
+ */
+export function canReleaseQueue(scheduledToken, currentToken) {
+    return scheduledToken === currentToken;
+}
+
 export function resolveQueueOwner(eventName, hasStarted) {
     if (eventName === "choose") {
         return "open";

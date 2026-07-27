@@ -7,7 +7,7 @@ namespace Kebechet.Blazor.SortableJS.Tests;
 public class PublicSurfaceTests
 {
     [Fact]
-    public void Options_surface_has_all_typed_configuration_members()
+    public void PublicSurface_SortableOptions_ExposesEveryTypedMember()
     {
         // Arrange
         const int expectedOptionMemberCount = 48;
@@ -20,7 +20,7 @@ public class PublicSurfaceTests
     }
 
     [Fact]
-    public void Component_exposes_all_fifteen_SortableJS_events()
+    public void PublicSurface_EverySortableJsEvent_IsExposedAsACallback()
     {
         // Arrange
         const int expectedEventCount = 15;
@@ -37,7 +37,7 @@ public class PublicSurfaceTests
     }
 
     [Fact]
-    public void Interop_reverts_element_children_and_never_indexes_child_nodes()
+    public void InteropModule_RestoringASnapshot_UsesElementChildrenNotChildNodes()
     {
         // Arrange
         var interopPath = Path.Combine(RepositoryRoot, "src", "Blazor.SortableJS", "wwwroot", "sortable-interop.js");

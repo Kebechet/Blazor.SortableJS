@@ -33,7 +33,7 @@ public class PackagingTests
     [InlineData("Kebechet.Blazor.SortableJS.lib.module.js")]
     [InlineData("sortable-interop.js")]
     [InlineData("sortable-policy.js")]
-    public void Static_web_asset_is_present(string fileName)
+    public void StaticWebAsset_ShippedModule_IsPresentInWwwroot(string fileName)
     {
         // Arrange
         var assetPath = Path.Combine(_wwwrootDirectory, fileName);
@@ -53,7 +53,7 @@ public class PackagingTests
     /// at load time in the browser, long after any build or unit test would have noticed.
     /// </remarks>
     [Fact]
-    public void Every_relative_import_resolves_to_a_shipped_file()
+    public void StaticWebAsset_RelativeImport_ResolvesToAShippedFile()
     {
         // Arrange
         var modulePaths = Directory.GetFiles(_wwwrootDirectory, "*.js");
@@ -77,7 +77,7 @@ public class PackagingTests
     }
 
     [Fact]
-    public void Vendored_bundle_is_the_pinned_SortableJS_version()
+    public void VendoredBundle_ShippedFile_IsThePinnedSortableJsVersion()
     {
         // Arrange
         var bundlePath = Path.Combine(_wwwrootDirectory, "Sortable.min.js");
@@ -90,7 +90,7 @@ public class PackagingTests
     }
 
     [Fact]
-    public void Initializer_loads_the_bundle_locally_and_never_from_a_cdn()
+    public void Initializer_BundleInjection_LoadsLocallyAndNeverFromACdn()
     {
         // Arrange
         var initializerPath = Path.Combine(_wwwrootDirectory, "Kebechet.Blazor.SortableJS.lib.module.js");

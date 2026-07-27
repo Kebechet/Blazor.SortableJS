@@ -31,7 +31,7 @@ public sealed class SortableItemLossTests : IDisposable
     [Theory]
     [InlineData(-1)]
     [InlineData(-5)]
-    public async Task Move_with_an_unusable_destination_index_keeps_the_item(int destinationIndex)
+    public async Task Move_UnusableDestinationIndex_KeepsTheItem(int destinationIndex)
     {
         // Arrange
         var items = new List<string> { "first", "second", "third" };
@@ -54,7 +54,7 @@ public sealed class SortableItemLossTests : IDisposable
     }
 
     [Fact]
-    public async Task Move_with_no_destination_index_keeps_the_item()
+    public async Task Move_NoDestinationIndex_KeepsTheItem()
     {
         // Arrange
         var items = new List<string> { "first", "second" };

@@ -8,7 +8,7 @@ namespace Kebechet.Blazor.SortableJS.Tests;
 public class SortableComponentTests
 {
     [Fact]
-    public async Task MultiDrag_reorders_all_selected_references_in_place()
+    public async Task MultiDrag_SeveralRowsSelected_ReordersEveryReferenceInPlace()
     {
         // Arrange
         using var context = CreateContext();
@@ -30,7 +30,7 @@ public class SortableComponentTests
     }
 
     [Fact]
-    public async Task Cross_list_move_preserves_the_object_reference()
+    public async Task CrossListMove_ItemTransferred_PreservesTheObjectReference()
     {
         // Arrange
         using var context = CreateContext();
@@ -51,7 +51,7 @@ public class SortableComponentTests
     }
 
     [Fact]
-    public async Task Clone_function_keeps_source_and_creates_the_configured_clone()
+    public async Task CloneMode_CloneFunctionSet_KeepsSourceAndCreatesTheConfiguredClone()
     {
         // Arrange
         using var context = CreateContext();
@@ -77,7 +77,7 @@ public class SortableComponentTests
     }
 
     [Fact]
-    public async Task Destination_can_convert_a_different_source_type()
+    public async Task CrossTypeMove_ConvertFunctionSet_ConvertsTheIncomingItem()
     {
         // Arrange
         using var context = CreateContext();
@@ -103,7 +103,7 @@ public class SortableComponentTests
     }
 
     [Fact]
-    public async Task Swap_exchanges_items_without_reconstructing_them()
+    public async Task Swap_ItemsExchanged_ReusesTheSameInstances()
     {
         // Arrange
         using var context = CreateContext();
@@ -123,7 +123,7 @@ public class SortableComponentTests
     }
 
     [Fact]
-    public async Task Add_callback_runs_before_the_collections_are_mutated()
+    public async Task OnAdd_ItemArriving_RunsBeforeTheCollectionsAreMutated()
     {
         // Arrange
         using var context = CreateContext();
@@ -149,7 +149,7 @@ public class SortableComponentTests
     }
 
     [Fact]
-    public async Task Remove_on_spill_removes_the_original_reference()
+    public async Task RemoveOnSpill_ItemDroppedOutside_RemovesTheOriginalReference()
     {
         // Arrange
         using var context = CreateContext();
@@ -168,7 +168,7 @@ public class SortableComponentTests
     }
 
     [Fact]
-    public void Component_renders_a_marked_wrapper_for_every_item()
+    public void Render_ItemsBound_MarksEveryItemWrapper()
     {
         // Arrange
         using var context = CreateContext();

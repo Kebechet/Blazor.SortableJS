@@ -4,6 +4,7 @@ import test from "node:test";
 import {
     indexOfChild,
     resolveQueueOwner,
+    canReleaseQueue,
     itemMarkerAttribute
 } from "../../src/Blazor.SortableJS/wwwroot/sortable-policy.js";
 
@@ -17,7 +18,7 @@ function list(children) {
     return { children };
 }
 
-test("an index counts only real rows, never the fallback ghost", () => {
+test("IndexOfChild_FallbackGhostInTheList_CountsOnlyRealRows", () => {
     // Arrange - SortableJS inserts its ghost into the list during a fallback drag, and it carries
     // the marker copied from the row it was cloned from.
     const first = row();
@@ -32,7 +33,7 @@ test("an index counts only real rows, never the fallback ghost", () => {
     assert.equal(index, 1);
 });
 
-test("an index skips the clone SortableJS leaves behind in clone mode", () => {
+test("IndexOfChild_CloneInTheList_SkipsTheClone", () => {
     // Arrange
     const clone = row();
     const target = row();
@@ -42,7 +43,7 @@ test("an index skips the clone SortableJS leaves behind in clone mode", () => {
     assert.equal(indexOfChild(list([clone, target]), target), 0);
 });
 
-test("an index ignores children that are not rows", () => {
+test("IndexOfChild_NonRowChild_IsIgnored", () => {
     // Arrange
     const decoration = row({ isItem: false });
     const target = row();
@@ -52,14 +53,14 @@ test("an index ignores children that are not rows", () => {
     assert.equal(indexOfChild(list([decoration, target]), target), 0);
 });
 
-test("an absent container or child yields no index", () => {
+test("IndexOfChild_AbsentContainerOrChild_YieldsNoIndex", () => {
     globalThis.Sortable = {};
     assert.equal(indexOfChild(null, row()), -1);
     assert.equal(indexOfChild(list([]), null), -1);
     assert.equal(indexOfChild(list([row()]), row()), -1);
 });
 
-test("a click that never became a drag releases the queue", () => {
+test("ResolveQueueOwner_ClickThatNeverBecameADrag_ReleasesTheQueue", () => {
     // Arrange & Act & Assert - SortableJS guards "end" behind Sortable.active, so choose/unchoose
     // with no start is all a plain click produces. Leaving the queue open would put every list on
     // the page back behind one chain.
@@ -67,15 +68,25 @@ test("a click that never became a drag releases the queue", () => {
     assert.equal(resolveQueueOwner("unchoose", false), "close");
 });
 
-test("a real drag keeps the queue open past unchoose", () => {
+test("ResolveQueueOwner_RealDrag_KeepsTheQueueOpenPastUnchoose", () => {
     // "unchoose" precedes add/remove/sort during a drop, and releasing there would split a
     // cross-list add/remove pair across two queues.
     assert.equal(resolveQueueOwner("unchoose", true), "keep");
     assert.equal(resolveQueueOwner("end", true), "close");
 });
 
-test("other events leave the queue alone", () => {
+test("ResolveQueueOwner_UnrelatedEvent_LeavesTheQueueAlone", () => {
     for (const eventName of ["start", "add", "remove", "sort", "update", "move", "spill"]) {
         assert.equal(resolveQueueOwner(eventName, true), "keep");
     }
+});
+
+test("QueueRelease_TimerFromTheDragThatScheduledIt_Releases", () => {
+    assert.equal(canReleaseQueue(4, 4), true);
+});
+
+test("QueueRelease_TimerOutlivedByANewDrag_DoesNotRelease", () => {
+    // The spill path defers its release through a timer that reads the queue state when it fires.
+    // Without this guard a late timer would release a queue the next drag is still using.
+    assert.equal(canReleaseQueue(4, 5), false);
 });

@@ -27,7 +27,7 @@ public sealed class SortableSwapTests : IDisposable
     }
 
     [Fact]
-    public async Task A_swap_across_two_lists_exchanges_both_items()
+    public async Task Swap_AcrossTwoLists_ExchangesBothItems()
     {
         // Arrange
         var left = new List<string> { "alpha", "bravo" };
@@ -44,7 +44,7 @@ public sealed class SortableSwapTests : IDisposable
     }
 
     [Fact]
-    public async Task A_swap_across_two_lists_never_loses_an_item()
+    public async Task Swap_AcrossTwoLists_LosesNoItem()
     {
         // Arrange
         var left = new List<string> { "alpha" };
@@ -60,7 +60,7 @@ public sealed class SortableSwapTests : IDisposable
     }
 
     [Fact]
-    public async Task A_swap_within_one_list_still_exchanges_two_positions()
+    public async Task Swap_WithinOneList_ExchangesTheTwoPositions()
     {
         // Arrange
         var items = new List<string> { "alpha", "bravo", "charlie" };
@@ -74,7 +74,7 @@ public sealed class SortableSwapTests : IDisposable
     }
 
     [Fact]
-    public async Task A_swap_onto_a_position_that_no_longer_exists_changes_nothing()
+    public async Task Swap_DestinationIndexOutOfRange_ChangesNothing()
     {
         // Arrange
         var left = new List<string> { "alpha" };

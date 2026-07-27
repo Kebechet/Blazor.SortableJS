@@ -8,7 +8,7 @@ namespace Kebechet.Blazor.SortableJS.Tests;
 public class SortableEventTests
 {
     [Fact]
-    public async Task Cross_type_add_callback_receives_the_converted_item_once()
+    public async Task OnAdd_CrossTypeMove_ReceivesTheConvertedItemOnce()
     {
         // Arrange
         using var context = CreateContext();
@@ -42,7 +42,7 @@ public class SortableEventTests
     }
 
     [Fact]
-    public async Task Remove_callback_receives_the_item_that_already_left_the_source()
+    public async Task OnRemove_ItemLeft_ReceivesTheItemThatLeftTheSource()
     {
         // Arrange
         using var context = CreateContext();

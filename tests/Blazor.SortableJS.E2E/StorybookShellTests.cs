@@ -33,7 +33,7 @@ public sealed class StorybookShellTests(DemoFixture fixture, ITestOutputHelper o
 
     [Theory]
     [MemberData(nameof(StoryPaths))]
-    public async Task ShellPageLoadsWithoutErrorsFromThisLibrary(string path)
+    public async Task ShellPage_StoryOpenedThroughTheSidebar_RaisesNoErrorFromThisLibrary(string path)
     {
         var errors = new List<string>();
         void OnConsole(object? _, IConsoleMessage message)

@@ -28,7 +28,7 @@ public sealed class SortableTransferPolicyTests : IDisposable
     }
 
     [Fact]
-    public async Task A_declined_conversion_leaves_both_collections_untouched()
+    public async Task TryConvert_ConversionDeclined_LeavesBothCollectionsUntouched()
     {
         // Arrange
         var source = new List<string> { "alpha", "beta" };
@@ -51,7 +51,7 @@ public sealed class SortableTransferPolicyTests : IDisposable
     }
 
     [Fact]
-    public async Task An_accepted_conversion_transfers_the_converted_item()
+    public async Task TryConvert_ConversionAccepted_TransfersTheConvertedItem()
     {
         // Arrange
         var source = new List<string> { "alpha" };
@@ -73,7 +73,7 @@ public sealed class SortableTransferPolicyTests : IDisposable
     }
 
     [Fact]
-    public async Task An_accept_only_list_takes_the_item_off_its_source_and_stores_nothing()
+    public async Task AcceptOnlyList_ItemDropped_TakesItOffTheSourceAndStoresNothing()
     {
         // Arrange
         var source = new List<string> { "alpha", "beta" };
@@ -93,7 +93,7 @@ public sealed class SortableTransferPolicyTests : IDisposable
     }
 
     [Fact]
-    public void An_undraggable_item_is_marked_for_the_filter_selector()
+    public void IsItemDraggable_ItemRejected_MarksTheRowForTheFilterSelector()
     {
         // Arrange & Act
         var component = _context.RenderComponent<Sortable<string>>(parameters => parameters
@@ -110,7 +110,7 @@ public sealed class SortableTransferPolicyTests : IDisposable
     }
 
     [Fact]
-    public void Registered_defaults_are_preferred_over_the_static_ones()
+    public void Defaults_RegisteredThroughServices_TakePrecedenceOverTheStatic()
     {
         // Arrange
         SortableDefaults.Options = new SortableOptions { GhostClass = "from-static" };
@@ -137,7 +137,7 @@ public sealed class SortableTransferPolicyTests : IDisposable
     }
 
     [Fact]
-    public async Task A_refused_item_blocks_the_whole_multidrag_selection()
+    public async Task CanAcceptItem_OneItemRefusedInAMultiDragSelection_BlocksTheWholeTransfer()
     {
         // Arrange - SortableJS asks the group put function once, about the primary dragged row, so
         // a forbidden row selected alongside an allowed one used to travel with it.
@@ -166,7 +166,7 @@ public sealed class SortableTransferPolicyTests : IDisposable
     }
 
     [Fact]
-    public async Task A_permitted_multidrag_selection_transfers_completely()
+    public async Task CanAcceptItem_EveryItemPermitted_TransfersTheWholeSelection()
     {
         // Arrange
         var source = new List<string> { "first", "second" };
@@ -194,7 +194,7 @@ public sealed class SortableTransferPolicyTests : IDisposable
     }
 
     [Fact]
-    public async Task A_source_can_keep_an_item_that_may_not_leave()
+    public async Task CanReleaseItem_ItemRefused_KeepsItInTheSourceList()
     {
         // Arrange
         var source = new List<string> { "pinned" };
@@ -214,6 +214,45 @@ public sealed class SortableTransferPolicyTests : IDisposable
         source.ShouldBe(["pinned"]);
         destination.ShouldBeEmpty();
         sourceComponent.Instance.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task OnRemove_TransferRefused_ReportsTheRefusedItemNotAnEarlierDrag()
+    {
+        // Arrange - a successful transfer first, so there is a previous result to go stale.
+        var source = new List<string> { "moved", "refused" };
+        var destination = new List<string>();
+        var removedItems = new List<string>();
+        var sourceComponent = _context.RenderComponent<Sortable<string>>(parameters => parameters
+            .Add(component => component.Id, "source")
+            .Add(component => component.Items, source)
+            .Add(component => component.OnRemove, args => removedItems.AddRange(args.Items))
+            .Add(component => component.ItemTemplate, item => builder => builder.AddContent(0, item)));
+        var destinationComponent = _context.RenderComponent<Sortable<string>>(parameters => parameters
+            .Add(component => component.Id, "destination")
+            .Add(component => component.Items, destination)
+            .Add(component => component.CanAcceptItem, context => context.Item != "refused")
+            .Add(component => component.ItemTemplate, item => builder => builder.AddContent(0, item)));
+
+        await destinationComponent.InvokeAsync(() => destinationComponent.Instance.HandleEventAsync(
+            AddEvent("source", "destination")));
+        removedItems.Clear();
+
+        // Act - now refuse one, and let the matching remove follow as SortableJS emits it.
+        await destinationComponent.InvokeAsync(() => destinationComponent.Instance.HandleEventAsync(
+            AddEvent("source", "destination")));
+        await sourceComponent.InvokeAsync(() => sourceComponent.Instance.HandleEventAsync(new SortableJsEvent
+        {
+            EventName = "remove",
+            SourceId = "source",
+            DestinationId = "destination",
+            OldIndexes = [0],
+            NewIndexes = [0]
+        }));
+
+        // Assert - the refused item, never the one that moved a moment ago.
+        removedItems.ShouldBe(["refused"]);
+        destination.ShouldBe(["moved"]);
     }
 
     private static bool TryConvertNothing(object item, out int converted)

@@ -24,7 +24,7 @@ public sealed class SortableDecisionTests
     [InlineData(SortableMoveDecision.Reject, 1)]
     [InlineData(SortableMoveDecision.InsertBefore, 2)]
     [InlineData(SortableMoveDecision.InsertAfter, 3)]
-    public void A_move_decision_crosses_the_boundary_as_its_numeric_value(SortableMoveDecision decision, int expected)
+    public void DecideMove_DecisionReturned_CrossesTheBoundaryAsItsNumericValue(SortableMoveDecision decision, int expected)
     {
         // Arrange
         var component = Create();
@@ -38,7 +38,7 @@ public sealed class SortableDecisionTests
     }
 
     [Fact]
-    public void A_move_decision_sees_the_dragged_and_related_items_of_its_own_list()
+    public void DecideMove_IndexesFromItsOwnList_ResolvesTheDraggedAndRelatedItems()
     {
         // Arrange
         SortableMoveContext<string>? observed = null;
@@ -67,7 +67,7 @@ public sealed class SortableDecisionTests
     }
 
     [Fact]
-    public void An_index_belonging_to_another_list_does_not_resolve_to_a_local_item()
+    public void DecideMove_IndexFromAnotherList_DoesNotResolveALocalItem()
     {
         // Arrange
         SortableMoveContext<string>? observed = null;
@@ -94,7 +94,7 @@ public sealed class SortableDecisionTests
     }
 
     [Fact]
-    public void Absent_decisions_accept_everything()
+    public void Decisions_NoneConfigured_AcceptEverything()
     {
         // Arrange
         var component = Create();
@@ -106,7 +106,7 @@ public sealed class SortableDecisionTests
     }
 
     [Fact]
-    public void A_put_decision_can_refuse_an_incoming_item()
+    public void DecidePut_PredicateRefuses_RejectsTheIncomingItem()
     {
         // Arrange
         var component = Create();
@@ -118,7 +118,7 @@ public sealed class SortableDecisionTests
     }
 
     [Fact]
-    public void A_pull_decision_can_keep_an_item_in_its_list()
+    public void DecidePull_PredicateRefuses_KeepsTheItemInItsList()
     {
         // Arrange
         var component = Create();
@@ -130,7 +130,7 @@ public sealed class SortableDecisionTests
     }
 
     [Fact]
-    public void Configuring_a_move_decision_off_webassembly_fails_loudly()
+    public void MoveDecision_ConfiguredOffWebAssembly_FailsLoudly()
     {
         // Arrange
         using var context = new TestContext();
@@ -148,7 +148,7 @@ public sealed class SortableDecisionTests
     }
 
     [Fact]
-    public void A_transfer_predicate_works_without_webassembly()
+    public void TransferPredicates_ConfiguredOffWebAssembly_AreAccepted()
     {
         // Arrange & Act - only MoveDecision needs synchronous interop. The transfer predicates are
         // enforced in .NET when the drop is applied, so a test host, and Blazor Server, can use them.
@@ -165,7 +165,7 @@ public sealed class SortableDecisionTests
     }
 
     [Fact]
-    public void A_decision_assigned_after_the_first_render_still_fails_loudly()
+    public void MoveDecision_AssignedAfterTheFirstRender_StillFailsLoudly()
     {
         // Arrange
         using var context = new TestContext();

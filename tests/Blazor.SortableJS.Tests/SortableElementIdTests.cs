@@ -28,7 +28,7 @@ public sealed class SortableElementIdTests : IDisposable
     /// generic type, so two item types would both start at 1 and collide in the shared registry.
     /// </summary>
     [Fact]
-    public void Generated_ids_are_unique_across_item_types()
+    public void GeneratedId_DifferentItemTypes_StaysUnique()
     {
         // Arrange & Act
         var first = _context.RenderComponent<Sortable<string>>(parameters => parameters

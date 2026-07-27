@@ -13,7 +13,7 @@ namespace Kebechet.Blazor.SortableJS.Tests;
 public sealed class SortableRenderDiffTests
 {
     [Fact]
-    public async Task Keyed_reorder_does_not_emit_item_attribute_edits()
+    public async Task KeyedReorder_ItemsReordered_EmitsNoItemAttributeEdits()
     {
         // Arrange
         using var services = new ServiceCollection()

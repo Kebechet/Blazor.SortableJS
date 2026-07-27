@@ -17,7 +17,7 @@ public sealed class SortableDragTests(DemoFixture fixture)
     private const string AutoScrollStory = "sortablejs-auto-scroll--auto-scroll";
 
     [Fact]
-    public async Task SameListReorderMutatesTheModelInPlace()
+    public async Task SameListDrag_ItemDraggedToTheEnd_MutatesTheModelInPlace()
     {
         var frame = await fixture.NavigateToStoryAsync(BasicStory);
         var before = await ReadModelAsync(frame);
@@ -33,7 +33,7 @@ public sealed class SortableDragTests(DemoFixture fixture)
     }
 
     [Fact]
-    public async Task CrossListTransferPreservesTheItemInstance()
+    public async Task CrossListDrag_ItemDroppedOnAnotherList_PreservesTheItemInstance()
     {
         var frame = await fixture.NavigateToStoryAsync(GroupsStory);
         var before = await ReadModelAsync(frame);
@@ -50,7 +50,7 @@ public sealed class SortableDragTests(DemoFixture fixture)
     }
 
     [Fact]
-    public async Task DeepLeafCanMoveToTheRootCollection()
+    public async Task NestedDrag_DeepLeafDraggedOut_MovesToTheRootCollection()
     {
         var frame = await fixture.NavigateToStoryAsync(NestingStory);
         var before = await ReadModelAsync(frame);
@@ -69,7 +69,7 @@ public sealed class SortableDragTests(DemoFixture fixture)
     }
 
     [Fact]
-    public async Task MultiDragMovesThreeNonAdjacentItemsInRelativeOrder()
+    public async Task MultiDragDrag_ThreeNonAdjacentItems_MoveInRelativeOrder()
     {
         var frame = await fixture.NavigateToStoryAsync(MultiDragStory);
         var controlClick = new LocatorClickOptions { Modifiers = [KeyboardModifier.Control] };
@@ -88,7 +88,7 @@ public sealed class SortableDragTests(DemoFixture fixture)
     }
 
     [Fact]
-    public async Task CloneModeKeepsTheSourceAndCreatesADistinctInstance()
+    public async Task CloneDrag_ItemDraggedFromThePalette_KeepsSourceAndCreatesADistinctInstance()
     {
         var frame = await fixture.NavigateToStoryAsync(CloneStory);
         var before = await ReadModelAsync(frame);
@@ -106,7 +106,7 @@ public sealed class SortableDragTests(DemoFixture fixture)
     }
 
     [Fact]
-    public async Task SwapPluginExchangesTheTwoItems()
+    public async Task SwapDrag_ItemDroppedOnAnother_ExchangesTheTwoItems()
     {
         var frame = await fixture.NavigateToStoryAsync(SwapStory);
 
@@ -118,7 +118,7 @@ public sealed class SortableDragTests(DemoFixture fixture)
     }
 
     [Fact]
-    public async Task PutDisabledRejectsTheDropWithoutChangingEitherModel()
+    public async Task PutDisabledDrag_DropAttempted_LeavesBothModelsUnchanged()
     {
         var frame = await fixture.NavigateToStoryAsync(GroupsStory);
 
@@ -213,7 +213,7 @@ public sealed class SortableDragTests(DemoFixture fixture)
     }
 
     [Fact]
-    public async Task SpillRevertPutsTheItemBackWhenDroppedOutsideEveryList()
+    public async Task SpillRevertDrag_DroppedOutsideEveryList_PutsTheItemBack()
     {
         var frame = await fixture.NavigateToStoryAsync(SpillStory);
         var before = await ReadModelAsync(frame);
@@ -230,7 +230,7 @@ public sealed class SortableDragTests(DemoFixture fixture)
     }
 
     [Fact]
-    public async Task SpillRemoveDropsTheItemFromTheModelWhenDroppedOutsideEveryList()
+    public async Task SpillRemoveDrag_DroppedOutsideEveryList_DropsTheItemFromTheModel()
     {
         var frame = await fixture.NavigateToStoryAsync(SpillStory);
 
@@ -243,7 +243,7 @@ public sealed class SortableDragTests(DemoFixture fixture)
     }
 
     [Fact]
-    public async Task AutoScrollScrollsTheContainerWhileDraggingTowardsItsEdge()
+    public async Task AutoScrollDrag_PointerHeldAtTheEdge_ScrollsTheContainer()
     {
         var frame = await fixture.NavigateToStoryAsync(AutoScrollStory);
         var container = frame.GetByTestId("scroll-container");
