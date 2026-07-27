@@ -158,15 +158,58 @@ public sealed class SortableDragTests(DemoFixture fixture)
     /// the row's own label keeps the pointer in the parent list, and above the row's midpoint,
     /// which is what makes SortableJS insert before it.
     /// </remarks>
+    /// <summary>
+    /// Where inside the target row to aim, as a fraction of its height.
+    /// </summary>
+    /// <remarks>
+    /// SortableJS decides before-vs-after by which half of the target the pointer sits in, so the
+    /// midpoint is exactly the decision boundary. Aiming at it made the outcome depend on sub-pixel
+    /// rounding and on the row shifting between measurement and arrival. Aim well inside the
+    /// intended half instead, while staying clear of the edge, where the neighbour takes over.
+    /// </remarks>
+    private const float BeforeTargetFraction = 0.2f;
+
+    /// <inheritdoc cref="BeforeTargetFraction"/>
+    private const float AfterTargetFraction = 0.8f;
+
+    /// <summary>
+    /// Pointer moves made on the target after arriving, before releasing the button.
+    /// </summary>
+    /// <remarks>
+    /// Their total duration must comfortably exceed the stories' 150ms AnimationDuration, because
+    /// SortableJS ignores a dragover on a row that is still animating.
+    /// </remarks>
+    private const int SettlePasses = 10;
+
+    /// <inheritdoc cref="SettlePasses"/>
+    private const int SettlePassDelayMilliseconds = 40;
+
     private static async Task<(float X, float Y)> ResolveDropPointAsync(
         ILocator target,
         ILocator targetLocator,
         bool afterTarget,
         LocatorBoundingBoxResult rowBox)
     {
+        // Dropping onto a list rather than onto one of its rows means appending to it. The
+        // fractions above describe a position within a row, and applying them to a container aims
+        // at a fifth of the whole list, which lands before its existing rows instead of after them.
+        if (await target.GetAttributeAsync("data-sortable-item") is null)
+        {
+            var lastRow = target.Locator("xpath=./*[@data-sortable-item]").Last;
+            var lastRowBox = await lastRow.CountAsync() > 0 ? await lastRow.BoundingBoxAsync() : null;
+            if (lastRowBox is null)
+            {
+                return (rowBox.X + rowBox.Width / 2, rowBox.Y + rowBox.Height / 2);
+            }
+
+            return (
+                lastRowBox.X + lastRowBox.Width / 2,
+                MathF.Min(lastRowBox.Y + lastRowBox.Height * AfterTargetFraction, rowBox.Y + rowBox.Height - 2));
+        }
+
         var hasNestedList = await target.Locator("[data-sortable-item]").CountAsync() > 0;
         var box = hasNestedList ? await targetLocator.BoundingBoxAsync() ?? rowBox : rowBox;
-        return (box.X + box.Width / 2, box.Y + box.Height * (afterTarget ? 0.9f : 0.5f));
+        return (box.X + box.Width / 2, box.Y + box.Height * (afterTarget ? AfterTargetFraction : BeforeTargetFraction));
     }
 
     [Fact]
@@ -310,42 +353,61 @@ public sealed class SortableDragTests(DemoFixture fixture)
         // midpoint, which is what makes SortableJS insert before it.
         var (endX, endY) = await ResolveDropPointAsync(target, targetLocator, afterTarget, targetBox);
 
-        // Step along the path in increments no larger than half a row. SortableJS's fallback path
-        // decides a swap when the pointer crosses a *sibling's* midpoint, so a few small jitters
-        // inside the source row - or one long jump past several rows - produce no sort at all.
-        var distance = Math.Max(Math.Abs(endX - startX), Math.Abs(endY - startY));
+        // Walk towards the target in increments no larger than half a row. SortableJS's fallback
+        // path decides a swap when the pointer crosses a *sibling's* midpoint, so a few small
+        // jitters inside the source row - or one long jump past several rows - produce no sort.
+        //
+        // The step is measured from where the pointer actually is, never interpolated from the
+        // mouse-down position. The destination moves while the drag is in flight - rows leave the
+        // source list and join whichever list the pointer is over - so re-steering a fraction of a
+        // stale origin-to-target line can place the pointer behind where it already was. SortableJS
+        // reads that backwards move as a drag in the opposite direction and undoes the swap it just
+        // made, which is what left an item one position short of its destination.
         var stride = Math.Max(sourceBox.Height / 2, 8);
-        var steps = Math.Max(8, (int)Math.Ceiling(distance / stride));
-        for (var step = 1; step <= steps; step++)
+        var currentX = startX;
+        var currentY = startY;
+        var maximumSteps = Math.Max(8, (int)Math.Ceiling(Math.Max(Math.Abs(endX - startX), Math.Abs(endY - startY)) / stride) + 8);
+        for (var step = 1; step <= maximumSteps; step++)
         {
-            // The destination shifts while the drag is in flight: rows are removed from the source
-            // list and inserted into whichever list the pointer is over, so a drop point computed
-            // at mouse-down is stale by the time the pointer arrives. Re-steer as we go.
-            if (step % 3 == 0)
+            var currentBox = await target.BoundingBoxAsync();
+            if (currentBox is not null)
             {
-                var currentBox = await target.BoundingBoxAsync();
-                if (currentBox is not null)
-                {
-                    (endX, endY) = await ResolveDropPointAsync(target, targetLocator, afterTarget, currentBox);
-                }
+                (endX, endY) = await ResolveDropPointAsync(target, targetLocator, afterTarget, currentBox);
             }
 
-            var progress = (float)step / steps;
-            await fixture.Page.Mouse.MoveAsync(
-                startX + (endX - startX) * progress,
-                startY + (endY - startY) * progress);
+            var remainingX = endX - currentX;
+            var remainingY = endY - currentY;
+            var remaining = MathF.Sqrt(remainingX * remainingX + remainingY * remainingY);
+            if (remaining <= 1)
+            {
+                break;
+            }
+
+            var advance = MathF.Min(stride, remaining) / remaining;
+            currentX += remainingX * advance;
+            currentY += remainingY * advance;
+            await fixture.Page.Mouse.MoveAsync(currentX, currentY);
             await fixture.Page.WaitForTimeoutAsync(30);
         }
 
-        // Settle on the final position so the last dragover lands where we intend.
-        var finalBox = await target.BoundingBoxAsync();
-        if (finalBox is not null)
+        // Keep the pointer moving on the target for longer than a row animation before releasing.
+        // SortableJS discards a dragover whose target is still animating from the previous swap,
+        // and it only reconsiders on the next pointer move. Arriving and stopping therefore loses
+        // the final swap outright whenever the walk ends inside that window - the item settles one
+        // position short of its destination. Alternating either side of the aim point guarantees a
+        // dragover after the animation has cleared, and re-resolving it each pass follows the row
+        // as the list reflows.
+        for (var settle = 0; settle < SettlePasses; settle++)
         {
-            var (finalX, finalY) = await ResolveDropPointAsync(target, targetLocator, afterTarget, finalBox);
-            await fixture.Page.Mouse.MoveAsync(finalX, finalY);
-            await fixture.Page.WaitForTimeoutAsync(60);
-            await fixture.Page.Mouse.MoveAsync(finalX, finalY + 1);
-            await fixture.Page.WaitForTimeoutAsync(60);
+            var settleBox = await target.BoundingBoxAsync();
+            if (settleBox is null)
+            {
+                break;
+            }
+
+            var (settleX, settleY) = await ResolveDropPointAsync(target, targetLocator, afterTarget, settleBox);
+            await fixture.Page.Mouse.MoveAsync(settleX, settleY + (settle % 2 == 0 ? -2 : 2));
+            await fixture.Page.WaitForTimeoutAsync(SettlePassDelayMilliseconds);
         }
 
         await fixture.Page.WaitForTimeoutAsync(150);
