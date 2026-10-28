@@ -89,6 +89,34 @@ public class PackagingTests
         banner.ShouldContain("Sortable 1.15.7");
     }
 
+    /// <summary>
+    /// The vendored bundle carries the change from https://github.com/SortableJS/Sortable/pull/2483
+    /// until a SortableJS release ships it (https://github.com/SortableJS/Sortable/issues/2307).
+    /// </summary>
+    /// <remarks>
+    /// Without it, a fallback drag whose row Blazor removes mid-drag - a row grabbed again after the
+    /// interop restored it, before the render of the previous move arrived - throws from
+    /// <c>_emulateDragOver</c> every 50 ms, and the empty-list detector puts the removed row back, so
+    /// the drop hands .NET a stale index and the wrong item moves. Upgrading the bundle replaces the
+    /// file wholesale, so this fails until the guards are re-applied or the release that contains them
+    /// is vendored; then the test and the README section go. The snippets use the 1.15.7 minified
+    /// names: <c>ht</c> is touchEvt, <c>$</c> is dragEl, <c>Ft</c> is nearestEmptyInsertDetectEvent.
+    /// </remarks>
+    [Theory]
+    [InlineData("_emulateDragOver:function(){if(ht&&$.parentNode){")]
+    [InlineData("function Ft(t){if($&&$.parentNode){")]
+    public void VendoredBundle_DraggedRowRemovedMidDrag_SkipsDragOverHandling(string guardedEntryPoint)
+    {
+        // Arrange
+        var bundlePath = Path.Combine(_wwwrootDirectory, "Sortable.min.js");
+
+        // Act
+        var bundle = File.ReadAllText(bundlePath);
+
+        // Assert
+        bundle.ShouldContain(guardedEntryPoint, Case.Sensitive);
+    }
+
     [Fact]
     public void Initializer_BundleInjection_LoadsLocallyAndNeverFromACdn()
     {

@@ -118,6 +118,20 @@ They are **observational**. SortableJS reads the return value of `onMove`, `grou
 
 The counts come from the actual vendored 1.15.7 source: 33 core options, 6 AutoScroll options, 2 OnSpill options, 2 Swap options, and 4 MultiDrag options. The event count is the 12 core callbacks plus MultiDrag `select`/`deselect` and OnSpill `spill`. Internal plugin hooks are excluded. Function-valued JavaScript options are represented by typed Blazor-friendly forms: local-storage `SortableStoreOptions`, `SetDataText`/`SetDataTextSelector`, `SortableDirection`, CSS filter and scroll-container selectors, and `ShouldContinueNativeScrolling`.
 
+## Patched SortableJS
+
+The vendored `Sortable.min.js` is the official 1.15.7 build plus one change. The change is the fix proposed in [SortableJS pull request 2483](https://github.com/SortableJS/Sortable/pull/2483) for [SortableJS issue 2307](https://github.com/SortableJS/Sortable/issues/2307), carried until a SortableJS release includes it.
+
+**What it changes.** During a fallback drag (any touch drag, or `ForceFallback`), `_emulateDragOver` and the empty-list detector now ignore the drag once the dragged element is no longer in the DOM. Without the change:
+
+- `_emulateDragOver` throws `Cannot read properties of null (reading 'Sortable…')` every 50 ms.
+- The empty-list detector puts the removed element back into a nearby empty list.
+- The drop then reports a move for a row Blazor has already removed, so a different item moves and the DOM no longer matches the collection.
+
+**How a Blazor app gets there.** After a drop, the interop restores the DOM and queues the event for .NET. The move appears only with the next render, which on Blazor Server and in a MAUI BlazorWebView is a round trip away. If the user grabs the restored row again before that render arrives, the render removes the very element being dragged.
+
+The patch is removed once a SortableJS release contains the fix. Until then, `PackagingTests` fails if a bundle upgrade drops it.
+
 ## Features
 
 - In-place same-list, cross-list, and multi-item moves with reference identity preserved

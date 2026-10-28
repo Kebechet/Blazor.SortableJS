@@ -21,8 +21,8 @@
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <PackageIcon>icon.png</PackageIcon>
     <PackageTags>blazor;sortable;sortablejs;drag-and-drop;dragdrop;reorder;sortable-list;webcomponent</PackageTags>
-    <Version>1.15.7</Version>
-    <PackageReleaseNotes>Initial release wrapping SortableJS 1.15.7.</PackageReleaseNotes>
+    <Version>1.15.7.1</Version>
+    <PackageReleaseNotes>SortableJS 1.15.7 patched with https://github.com/SortableJS/Sortable/pull/2483: a fallback drag whose element was removed from the DOM no longer throws every 50 ms or puts the removed element back into an empty list.</PackageReleaseNotes>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
